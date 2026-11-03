@@ -53,6 +53,8 @@ any installation using real security data.
 
 ## Develop
 
+Install `redis-server` for the session revocation tests, then run:
+
 ```sh
 npm ci
 npm run db:generate

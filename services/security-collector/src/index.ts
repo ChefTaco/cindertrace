@@ -1,6 +1,7 @@
 import { collectHiveSecurity } from "./hive.js";
 import {
   parseUiSecurity,
+  uiWindowStart,
   uiApplications,
   type UiSources,
 } from "./ui-security.js";
@@ -408,7 +409,10 @@ async function pollLoki(): Promise<void> {
       : parsedCheckpoint + 1n;
   const initialLimit = Number(lokiEnvironment("LIMIT") ?? "1000");
   const query = lokiEnvironment("QUERY");
-  if (!query) throw new Error("LOKI_QUERY must explicitly select the configured source stream");
+  if (!query)
+    throw new Error(
+      "LOKI_QUERY must explicitly select the configured source stream",
+    );
   const fetchPage = async (requestUrl: URL) => {
     const { response, body: rawBody } = await request(requestUrl, {
       headers: {
@@ -489,13 +493,10 @@ async function pollUiSecurity(): Promise<void> {
   if (!base?.startsWith("https://") || !credential)
     throw Error("UI audit requires the authenticated Loki read boundary");
   const end = BigInt(Date.now()) * 1_000_000n;
-  const checkpoints = enabledUiSources
-    .map((source) => cursors.get(source))
-    .filter((x): x is string => !!x && /^\d+$/.test(x));
-  const start =
-    checkpoints.length === enabledUiSources.length
-      ? checkpoints.map(BigInt).reduce((a, b) => (a < b ? a : b))
-      : end - 15n * 60n * 1_000_000_000n;
+  const start = uiWindowStart(
+    enabledUiSources.map((source) => cursors.get(source)),
+    end,
+  );
   // Inclusive replay keeps same-timestamp boundaries complete; event UUIDs deduplicate.
   const entries = await fetchCompleteLokiWindow(
     base,

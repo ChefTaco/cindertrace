@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseUiSecurity } from "./ui-security.js";
+import { parseUiSecurity, uiWindowStart } from "./ui-security.js";
 const raw = {
   schemaVersion: 1,
   eventId: "12345678-1234-1234-1234-123456789abc",
@@ -19,6 +19,12 @@ const labels = {
 };
 const sources = { magnus_ui: ["192.0.2.2"] };
 describe("UI audit ingestion", () => {
+  it("retains the oldest saved checkpoint when a new console source is enabled", () => {
+    const now = 2_000_000_000_000_000_000n,
+      old = now - 60n * 60n * 1_000_000_000n;
+    expect(uiWindowStart([old.toString(), undefined], now)).toBe(old);
+    expect(uiWindowStart([], now)).toBe(now - 15n * 60n * 1_000_000_000n);
+  });
   it("supports the standalone console alone without legacy UI sources", () => {
     const event = parseUiSecurity(
       JSON.stringify({ ...raw, application: "cindertrace_ui" }),

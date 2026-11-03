@@ -2,12 +2,14 @@ name: Verify
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+env:
+  NEXT_TELEMETRY_DISABLED: '1'
 jobs:
   verify:
     strategy:
       matrix:
         node: ['24.22.1', '26.13.0']
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -17,13 +19,15 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+      - name: Install session test dependency
+        run: sudo apt-get update -qq && sudo apt-get install -y redis-server
       - run: npm ci
       - run: npm run verify
       - run: npm audit --omit=dev --audit-level=moderate
       - run: npm run stage -w @cindertrace/console
       - run: node scripts/check-private.mjs --artifact apps/security-console/dist
   standalone:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

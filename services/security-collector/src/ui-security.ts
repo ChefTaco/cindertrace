@@ -8,6 +8,17 @@ export const uiApplications = {
 } as const;
 export type UiSource = (typeof uiApplications)[keyof typeof uiApplications];
 export type UiSources = Partial<Record<UiSource, string[]>>;
+export function uiWindowStart(
+  checkpoints: Array<string | undefined>,
+  now: bigint,
+): bigint {
+  const saved = checkpoints
+    .filter((value): value is string => !!value && /^\d+$/.test(value))
+    .map(BigInt);
+  return saved.length
+    ? saved.reduce((a, b) => (a < b ? a : b))
+    : now - 15n * 60n * 1_000_000_000n;
+}
 const outcomes = new Set([
   "auth.login_failed",
   "auth.login_succeeded",
