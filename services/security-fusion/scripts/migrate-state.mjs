@@ -182,6 +182,20 @@ try {
     )
       throw new Error("Unexpected supplementary table");
     if (mode === "import" || mode === "replace-frozen") {
+      if (
+        data.tables.security_fusion_command_outbox.rows.some((row) =>
+          ["pending", "dispatching", "unknown"].includes(row.status),
+        ) ||
+        data.tables.security_fusion_action_approvals.rows.some(
+          (row) => row.status === "pending",
+        ) ||
+        (data.supplementary?.security_executions?.rows ?? []).some(
+          (row) => !["completed", "failed"].includes(row.status),
+        )
+      )
+        throw new Error(
+          "Pending, active, unknown, or orphaned effects block ownership transfer; reconcile and audit cancellation on the source first",
+        );
       for (const row of data.tables.security_fusion_actions.rows) {
         if (
           [

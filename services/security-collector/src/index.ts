@@ -27,6 +27,7 @@ import type {
   SecurityFusionSourceReport,
   SecurityFusionSourceStatus,
 } from "@cindertrace/contracts";
+import { securityFusionSourceSchema } from "@cindertrace/contracts";
 import {
   aggregateUnifiLokiEvents,
   externalEvent,
@@ -77,6 +78,7 @@ const sourceHealth = new Map<
     error?: string;
   }
 >();
+let admittedSources: Set<SecurityFusionSource> | null = null;
 
 function setSourceStatus(
   source: SecurityFusionSource,
@@ -189,11 +191,15 @@ async function flush(): Promise<void> {
 
 async function reportSourceStatus(): Promise<void> {
   if (sourceHealth.size === 0) return;
+  const admitted = [...sourceHealth.entries()].filter(
+    ([source]) => !admittedSources || admittedSources.has(source),
+  );
+  if (!admitted.length) return;
   const report: SecurityFusionSourceReport = {
     schemaVersion: "1.0",
     collectorId,
     sentAt: new Date().toISOString(),
-    sources: [...sourceHealth.entries()].map(([source, state]) => ({
+    sources: admitted.map(([source, state]) => ({
       source,
       status: state.status,
       ...(state.lastEventAt ? { lastEventAt: state.lastEventAt } : {}),
@@ -225,10 +231,20 @@ async function hydrateCheckpoints(): Promise<void> {
   );
   if (!response.ok)
     throw new Error(`checkpoint hydration returned ${response.status}`);
-  const body = parseBoundedJson<{ data?: Record<string, string | null> }>(
-    rawBody,
-    "checkpoint hydration",
-  );
+  const body = parseBoundedJson<{
+    data?: Record<string, string | null>;
+    allowedSources?: unknown;
+  }>(rawBody, "checkpoint hydration");
+  if (body.allowedSources !== undefined) {
+    admittedSources = new Set(
+      securityFusionSourceSchema.array().min(1).parse(body.allowedSources),
+    );
+    for (const [source, state] of sourceHealth)
+      if (state.status !== "unconfigured" && !admittedSources.has(source))
+        throw new Error(
+          `Configured source is outside this collector's admission: ${source}`,
+        );
+  }
   for (const [source, checkpoint] of Object.entries(body.data ?? {})) {
     if (checkpoint) {
       cursors.set(source, checkpoint);
@@ -578,20 +594,20 @@ for (const source of enabledUiSources) setSourceStatus(source, "configured");
 setSourceStatus(
   "unifi_ids",
   process.env["SECURITY_FUSION_UDP_ENABLED"] === "true" ||
-    lokiEnvironment("URL")
+    runtimeConfig.lokiSourcesEnabled
     ? "configured"
     : "unconfigured",
 );
 setSourceStatus(
   "netflow",
   process.env["SECURITY_FUSION_UDP_ENABLED"] === "true" ||
-    lokiEnvironment("URL")
+    runtimeConfig.lokiSourcesEnabled
     ? "configured"
     : "unconfigured",
 );
 setSourceStatus(
   "unifi_dns",
-  process.env["UNIFI_DNS_LOG_PATH"] || lokiEnvironment("URL")
+  process.env["UNIFI_DNS_LOG_PATH"] || runtimeConfig.lokiSourcesEnabled
     ? "configured"
     : "unconfigured",
 );
@@ -623,7 +639,7 @@ async function pollSources(): Promise<void> {
     process.env["TAILSCALE_LOCAL_ENABLED"] === "true"
   )
     work.push(runPoll("tailscale poll failed", ["tailscale"], pollTailscale));
-  if (lokiEnvironment("URL")) {
+  if (runtimeConfig.lokiSourcesEnabled) {
     work.push(
       runPoll(
         "Loki poll failed",

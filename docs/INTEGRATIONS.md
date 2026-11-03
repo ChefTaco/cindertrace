@@ -12,8 +12,11 @@ use that name as a compatibility alias for the Cindertrace API URL.
 UDP input requires `SECURITY_FUSION_UDP_ENABLED=true`; configure an appropriate
 bind address and network policy. Tailscale local polling requires
 `TAILSCALE_LOCAL_ENABLED=true`; API polling requires its token and tailnet.
-Loki requires `LOKI_URL`, an explicit `LOKI_QUERY` selecting the configured source
-stream, and its dedicated read credential.
+Network collection through Loki requires `LOKI_URL`, an explicit `LOKI_QUERY`
+selecting the configured source stream, and its dedicated read credential. UI
+audit collection uses `UI_SECURITY_SOURCES_JSON` and the authenticated Loki
+transport; it does not enable network sources. Source status reports stay within
+the collector's admitted sources, including disabled sources it owns.
 ChatterMost/Mattermost audit export uses `CHATTERMOST_SECURITY_EXPORT_URL` and
 `CHATTERMOST_SECURITY_EXPORT_TOKEN`. No message bodies are ingested.
 

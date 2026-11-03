@@ -325,6 +325,7 @@ securityFusionRouter.get("/ingest/checkpoints", async (c) => {
   });
   return c.json({
     success: true,
+    allowedSources: credential.allowedSources,
     data: Object.fromEntries(
       states.map((state) => [state.source, state.checkpoint]),
     ),

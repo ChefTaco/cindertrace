@@ -29,6 +29,31 @@ function event(eventId: string): SecurityFusionEvent {
 }
 
 describe("security collector runtime guards", () => {
+  it("keeps network sources disabled when Loki is configured only for UI audit", () => {
+    const uiOnly = {
+      SECURITY_FUSION_INGEST_SECRET: ingestSecret,
+      LOKI_URL: "https://logs.example.com",
+      LOKI_READ_TOKEN: "fixture-loki-read-credential-".repeat(2),
+      UI_SECURITY_SOURCES_JSON: JSON.stringify({
+        cindertrace_ui: ["192.0.2.2"],
+      }),
+    };
+    expect(readSecurityCollectorRuntimeConfig(uiOnly).lokiSourcesEnabled).toBe(
+      false,
+    );
+    expect(
+      readSecurityCollectorRuntimeConfig({
+        ...uiOnly,
+        LOKI_QUERY: '{job="network"}',
+      }).lokiSourcesEnabled,
+    ).toBe(true);
+    expect(() =>
+      readSecurityCollectorRuntimeConfig({
+        SECURITY_FUSION_INGEST_SECRET: ingestSecret,
+        LOKI_QUERY: '{job="network"}',
+      }),
+    ).toThrow("requires its HTTPS URL");
+  });
   it("starts without external integrations and rejects partial or retired source configuration", () => {
     const base = { SECURITY_FUSION_INGEST_SECRET: ingestSecret };
     expect(() => readSecurityCollectorRuntimeConfig(base)).not.toThrow();

@@ -27,6 +27,7 @@ const OTHER_SECRET_NAMES = [
 
 export interface SecurityCollectorRuntimeConfig {
   ingestSecret: string;
+  lokiSourcesEnabled: boolean;
   httpTimeoutMs: number;
   maxResponseBytes: number;
   maxQueueEvents: number;
@@ -107,8 +108,12 @@ export function readSecurityCollectorRuntimeConfig(
     (!env["LOKI_READ_TOKEN"] || env["LOKI_READ_TOKEN"].length < 40)
   )
     throw new Error("Loki requires its dedicated read credential");
+  if (env["LOKI_QUERY"]?.trim() && !env["LOKI_URL"])
+    throw new Error("A Loki source query requires its HTTPS URL");
   return {
     ingestSecret,
+    // UI audit uses the same transport, with its own source-specific query.
+    lokiSourcesEnabled: Boolean(env["LOKI_URL"] && env["LOKI_QUERY"]?.trim()),
     httpTimeoutMs: boundedInteger(
       env,
       "SECURITY_FUSION_HTTP_TIMEOUT_MS",

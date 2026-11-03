@@ -104,6 +104,23 @@ try {
     });
   assert.equal((await ingest()).status, 202);
   assert.equal((await ingest()).status, 409);
+  const checkpointNonce = randomBytes(18).toString("base64url");
+  const checkpointReply = await app.request(
+    "/api/v1/security-fusion/ingest/checkpoints",
+    {
+      headers: {
+        ...headers,
+        "x-security-nonce": checkpointNonce,
+        "x-security-signature": createHmac("sha256", secret)
+          .update(`${collectorId}.${timestamp}.${checkpointNonce}.`)
+          .digest("hex"),
+      },
+    },
+  );
+  assert.equal(checkpointReply.status, 200);
+  const checkpointPolicy = await checkpointReply.json();
+  assert(checkpointPolicy.allowedSources.includes("cindertrace_ui"));
+  assert(checkpointPolicy.allowedSources.includes("wazuh"));
   const uiEvents = ["aegis_ui", "security_console", "cindertrace_ui"].map(
     (source, index) => ({
       ...event,

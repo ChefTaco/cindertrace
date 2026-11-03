@@ -219,9 +219,29 @@ try {
         )
       ).rows[0].n,
     );
+    const pendingApprovals = Number(
+      (
+        await db.query(
+          "SELECT count(*) AS n FROM security_fusion_action_approvals WHERE status='pending'",
+        )
+      ).rows[0].n,
+    );
+    const unsafeExecutions = extra.includes("security_executions")
+      ? Number(
+          (
+            await db.query(
+              "SELECT count(*) AS n FROM security_executions WHERE status NOT IN ('completed','failed')",
+            )
+          ).rows[0].n,
+        )
+      : 0;
     const manifest = {
       version: 2,
-      transferSafe: unsafeActions === 0 && unsafeOutbox === 0,
+      transferSafe:
+        unsafeActions === 0 &&
+        unsafeOutbox === 0 &&
+        pendingApprovals === 0 &&
+        unsafeExecutions === 0,
       databaseSha256: await streamHash(
         createReadStream(join(temporary, "database.dump")),
       ),

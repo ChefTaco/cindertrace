@@ -142,6 +142,77 @@ const importedIntegrity = execFileSync(
   ["scripts/verify-restored-state.mjs"],
   { cwd: api, env: importedEnv, encoding: "utf8" },
 );
+// Orphaned state must block transfer even when no action points to it.
+const unsafeName = name.replace("restore_", "unsafe_");
+const clone = new Client({ connectionString: sourceUrl });
+await clone.connect();
+try {
+  await clone.query(`CREATE DATABASE "${unsafeName}" TEMPLATE "${name}"`);
+} finally {
+  await clone.end();
+}
+const unsafeEnv = {
+  ...env,
+  DATABASE_URL: sourceUrl.replace(/\/[^/]+$/, "/" + unsafeName),
+  SECURITY_BACKUP_UPLOAD_URL: "",
+};
+const unsafeDb = new Client({ connectionString: unsafeEnv.DATABASE_URL });
+await unsafeDb.connect();
+try {
+  await unsafeDb.query(
+    `INSERT INTO security_executions (id,"actionId",operation,"nodeId",status,"resultJson") VALUES ('fixture-orphan','fixture-missing-action','execute','fixture-node','unknown','{}')`,
+  );
+  for (const condition of ["unknown-execution", "pending-approval"]) {
+    if (condition === "pending-approval") {
+      await unsafeDb.query(
+        `UPDATE security_executions SET status='completed' WHERE id='fixture-orphan'`,
+      );
+      await unsafeDb.query(
+        `INSERT INTO security_fusion_action_approvals (id,"actionId","previewSha256","tokenHash",status,"requestedBy","expiresAt") VALUES ('fixture-orphan-approval','fixture-missing-action','fixture-digest','fixture-token','pending','fixture-admin',now()+interval '10 minutes')`,
+      );
+    }
+    const native = state + "/" + condition + ".aes",
+      json = state + "/" + condition + ".json.gz";
+    execFileSync(process.execPath, ["scripts/backup.mjs", "backup", native], {
+      cwd: root,
+      env: unsafeEnv,
+      stdio: "pipe",
+    });
+    const refusedNative = spawnSync(
+      process.execPath,
+      ["scripts/backup.mjs", "import", native],
+      { cwd: root, env: importedEnv, encoding: "utf8" },
+    );
+    if (
+      refusedNative.status === 0 ||
+      !refusedNative.stderr.includes(
+        "Pending, active, or unknown effects block ownership transfer",
+      )
+    )
+      throw new Error(
+        "Unsafe native transfer was not refused before import: " + condition,
+      );
+    execFileSync(
+      process.execPath,
+      ["scripts/migrate-state.mjs", "export", json],
+      { cwd: api, env: unsafeEnv, stdio: "pipe" },
+    );
+    const refusedJson = spawnSync(
+      process.execPath,
+      ["scripts/migrate-state.mjs", "import", json],
+      { cwd: api, env: importedEnv, encoding: "utf8" },
+    );
+    if (
+      refusedJson.status === 0 ||
+      !refusedJson.stderr.includes("orphaned effects block ownership transfer")
+    )
+      throw new Error(
+        "Unsafe JSON transfer was not refused before import: " + condition,
+      );
+  }
+} finally {
+  await unsafeDb.end();
+}
 console.log(
   JSON.stringify({
     tamperingRejected: true,
@@ -149,6 +220,7 @@ console.log(
     encryptedBackupVerified: true,
     independentRestoreVerified: true,
     embeddedImportVerified: true,
+    orphanedEffectsBlockTransfer: true,
     importedIntegrity: JSON.parse(importedIntegrity),
     integrity: JSON.parse(result),
   }),
