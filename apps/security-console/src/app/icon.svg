@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Cindertrace">
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#090b10"/>
+  <path d="M42 12C38 25 18 21 18 38c0 10 7 16 16 16 10 0 17-8 17-18-4 5-8 7-12 5 9-10 5-19 3-29Z" fill="#ff8055"/>
+  <path d="M34 31c-1 8-8 9-8 15 0 5 3 8 8 8 6 0 10-4 10-9-4 2-7 0-6-4 1-4-1-8-4-10Z" fill="#ffe0ad"/>
+  <path d="M12 17h12M10 25h8" stroke="#ff8055" stroke-width="3" stroke-linecap="round"/>
+</svg>

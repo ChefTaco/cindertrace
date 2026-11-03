@@ -1,0 +1,6 @@
+Cindertrace
+Copyright contributors
+
+Includes Security Fusion code derived from Magnus, Copyright Magnus contributors.
+Licensed under the Apache License, Version 2.0.
+Bundled JetBrains Mono font is licensed under the SIL Open Font License; see apps/security-console/src/app/fonts/OFL.txt.

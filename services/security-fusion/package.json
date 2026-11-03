@@ -1,0 +1,42 @@
+{
+  "name": "@cindertrace/api",
+  "version": "0.1.0",
+  "description": "Cindertrace api",
+  "type": "module",
+  "engines": {
+    "node": "^24.22.1 || ^26.13.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/clean-build.mjs && prisma generate && tsc --build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "db:generate": "prisma generate",
+    "db:migrate:deploy": "node scripts/apply-migrations.mjs",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@cindertrace/contracts": "0.1.0",
+    "@hono/node-server": "2.1.5",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "dotenv": "18.0.9",
+    "hono": "4.13.16",
+    "ioredis": "6.0.0",
+    "jose": "6.2.13",
+    "ky": "2.2.0",
+    "nanoid": "6.0.2",
+    "pg": "8.23.1",
+    "zod": "4.6.7",
+    "@cindertrace/integrations": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "prisma": "7.10.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  },
+  "private": true,
+  "license": "Apache-2.0"
+}

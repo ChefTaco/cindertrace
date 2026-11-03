@@ -1,0 +1,47 @@
+name: Verify
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      matrix:
+        node: ['24.22.1', '26.13.0']
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npm audit --omit=dev --audit-level=moderate
+      - run: npm run stage -w @cindertrace/console
+      - run: node scripts/check-private.mjs --artifact apps/security-console/dist
+  standalone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run init
+      - run: docker compose up --build --wait
+      - run: docker compose exec -T -e CINDERTRACE_DEMO_CONFIRM=isolated-synthetic-installation api node scripts/demo.mjs --preserve
+      - run: docker compose exec -T postgres createdb -U cindertrace cindertrace_test_core_ci
+      - run: >-
+          docker compose exec -T api node -e
+          'process.env.CINDERTRACE_TEST_DATABASE_URL=process.env.DATABASE_URL.replace(/\/[^/]+$/,"/cindertrace_test_core_ci");import("./scripts/core-integration.mjs")'
+      - run: docker compose exec -T -e CINDERTRACE_RECOVERY_TEST_CONFIRM=disposable-installation api node scripts/recovery-integration.mjs
+      - name: Stop disposable installation
+        if: always()
+        run: docker compose down

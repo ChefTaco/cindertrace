@@ -1,0 +1,51 @@
+{
+  "name": "cindertrace",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": "^24.22.1 || ^26.13.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @cindertrace/contracts -w @cindertrace/integrations -w @cindertrace/api -w @cindertrace/collector -w @cindertrace/console",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && node --test scripts/*.test.mjs",
+    "db:generate": "npm run db:generate -w @cindertrace/api",
+    "db:migrate": "npm run db:migrate:deploy -w @cindertrace/api",
+    "init": "node scripts/init.mjs",
+    "check:private": "node scripts/check-private.mjs",
+    "scan:secrets": "node scripts/check-private.mjs --secrets",
+    "verify": "npm run build && npm run typecheck && npm test && npm run openapi:check && npm run check:private",
+    "openapi:check": "node scripts/check-openapi.mjs",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "test:core": "node scripts/core-integration.mjs",
+    "test:recovery": "node scripts/recovery-integration.mjs",
+    "demo": "node scripts/demo.mjs"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "vitest": "4.1.12",
+    "yaml": "2.9.1"
+  },
+  "overrides": {
+    "@hono/node-server": "2.1.5",
+    "fast-uri": "3.1.9",
+    "postcss": {
+      ".": "8.5.32",
+      "nanoid": "3.3.18"
+    }
+  },
+  "allowScripts": {
+    "argon2@0.45.1": true,
+    "esbuild@0.28.2": true,
+    "prisma@7.10.1": true,
+    "@prisma/engines@7.10.1": true
+  }
+}

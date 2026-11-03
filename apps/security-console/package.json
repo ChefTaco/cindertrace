@@ -1,0 +1,48 @@
+{
+  "name": "@cindertrace/console",
+  "version": "0.1.0",
+  "description": "Cindertrace console",
+  "type": "module",
+  "engines": {
+    "node": "^24.22.1 || ^26.13.0"
+  },
+  "scripts": {
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "start": "node server.mjs",
+    "dev": "next dev --hostname 127.0.0.1",
+    "stage": "node scripts/stage.mjs"
+  },
+  "files": [
+    ".next/standalone",
+    ".next/static",
+    "public"
+  ],
+  "dependencies": {
+    "argon2": "0.45.1",
+    "clsx": "2.1.0",
+    "dotenv": "18.0.9",
+    "ioredis": "6.0.0",
+    "jose": "6.2.13",
+    "lucide-react": "1.64.0",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "3.7.0",
+    "undici": "8.12.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "postcss": "8.5.32",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  },
+  "private": true,
+  "license": "Apache-2.0"
+}

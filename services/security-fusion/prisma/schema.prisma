@@ -1,0 +1,433 @@
+// Cindertrace Security Fusion schema; historical table mappings are stable.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/db/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model SecurityFusionEvent {
+  id              String   @id @default(cuid())
+  eventId         String   @unique
+  source          String
+  sourceEventId   String
+  kind            String
+  observedAt      DateTime
+  ingestedAt      DateTime @default(now())
+  severity        String
+  confidence      Float
+  summary         String
+  attributesJson  String   @default("{}")
+  integritySha256 String
+  collectorId     String
+
+  @@unique([source, sourceEventId])
+  @@index([observedAt])
+  @@index([source, observedAt])
+  @@index([kind, observedAt])
+  @@index([severity, observedAt])
+  @@map("security_fusion_events")
+}
+
+model SecurityFusionEntity {
+  id          String   @id @default(cuid())
+  type        String
+  canonical   String
+  label       String
+  aliasesJson String   @default("[]")
+  firstSeenAt DateTime
+  lastSeenAt  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([type, canonical])
+  @@index([lastSeenAt])
+  @@map("security_fusion_entities")
+}
+
+model SecurityFusionEventEntity {
+  id       String @id @default(cuid())
+  eventId  String
+  entityId String
+
+  @@unique([eventId, entityId])
+  @@index([entityId])
+  @@map("security_fusion_event_entities")
+}
+
+model SecurityFusionEntityAlias {
+  id          String   @id @default(cuid())
+  entityId    String
+  source      String
+  value       String
+  canonical   String
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@unique([source, canonical])
+  @@index([entityId])
+  @@map("security_fusion_entity_aliases")
+}
+
+model SecurityFusionCase {
+  id                           String    @id @default(cuid())
+  fingerprint                  String    @unique
+  title                        String
+  status                       String    @default("new")
+  severity                     String
+  confidence                   Float
+  summary                      String
+  recommendedInvestigationJson String    @default("[]")
+  evidenceStepsJson            String    @default("[]")
+  assignedTo                   String?
+  firstSeenAt                  DateTime
+  lastSeenAt                   DateTime
+  resolvedAt                   DateTime?
+  archivedAt                   DateTime?
+  evidenceAcceptedCount        Int       @default(0)
+  evidenceTruncatedCount       Int       @default(0)
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  @@index([status, severity, lastSeenAt])
+  @@index([archivedAt, lastSeenAt])
+  @@map("security_fusion_cases")
+}
+
+model SecurityFusionCaseEvent {
+  id                     String @id @default(cuid())
+  caseId                 String
+  eventId                String
+  ruleId                 String @default("builtin-security-fusion")
+  confidenceContribution Float  @default(0)
+
+  @@unique([caseId, eventId])
+  @@index([eventId])
+  @@map("security_fusion_case_events")
+}
+
+model SecurityFusionCaseEntity {
+  id       String @id @default(cuid())
+  caseId   String
+  entityId String
+
+  @@unique([caseId, entityId])
+  @@index([entityId])
+  @@map("security_fusion_case_entities")
+}
+
+model SecurityFusionCaseRelationship {
+  id            String   @id @default(cuid())
+  fromCaseId    String
+  toCaseId      String
+  kind          String
+  confidence    Float
+  rationaleJson String   @default("{}")
+  createdAt     DateTime @default(now())
+
+  @@unique([fromCaseId, toCaseId, kind])
+  @@index([toCaseId])
+  @@map("security_fusion_case_relationships")
+}
+
+model SecurityFusionRuleVersion {
+  id             String   @id @default(cuid())
+  ruleId         String
+  version        Int
+  enabled        Boolean  @default(true)
+  definitionJson String
+  sha256         String
+  createdAt      DateTime @default(now())
+
+  @@unique([ruleId, version])
+  @@index([enabled])
+  @@map("security_fusion_rule_versions")
+}
+
+model SecurityFusionCaseActivity {
+  id         String   @id @default(cuid())
+  caseId     String
+  kind       String
+  actorId    String
+  detailJson String   @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([caseId, createdAt])
+  @@map("security_fusion_case_activity")
+}
+
+model SecurityFusionEvidence {
+  id               String    @id @default(cuid())
+  caseId           String
+  eventId          String?
+  sourceLocator    String
+  mediaType        String
+  sha256           String
+  storagePath      String
+  preservedBy      String
+  preservedAt      DateTime  @default(now())
+  expiresAt        DateTime
+  byteSize         Int       @default(0)
+  integrityStatus  String    @default("verified")
+  quarantinedAt    DateTime?
+  quarantineReason String?
+
+  @@index([caseId, preservedAt])
+  @@index([sha256])
+  @@map("security_fusion_evidence")
+}
+
+model SecurityFusionSourceState {
+  id             String    @id
+  source         String    @unique
+  status         String    @default("unknown")
+  checkpoint     String?
+  lastEventAt    DateTime?
+  lastSuccessAt  DateTime?
+  lastErrorAt    DateTime?
+  lastError      String?
+  rejectedCount  Int       @default(0)
+  truncatedCount Int       @default(0)
+  updatedAt      DateTime  @updatedAt
+
+  @@map("security_fusion_source_state")
+}
+
+model SecurityFusionDeletionReceipt {
+  id                    String   @id @default(cuid())
+  resourceType          String
+  resourceIdHash        String
+  reason                String
+  outcome               String
+  bytesDeleted          Int      @default(0)
+  detailJson            String   @default("{}")
+  receiptSha256         String   @unique
+  previousReceiptSha256 String?
+  chainSequence         Int
+  chainVersion          Int      @default(2)
+  deletedAt             DateTime @default(now())
+
+  @@unique([chainSequence])
+  @@index([resourceType, deletedAt])
+  @@index([deletedAt])
+  @@map("security_fusion_deletion_receipts")
+}
+
+model SecurityFusionReceiptChainHead {
+  id            String   @id
+  headSha256    String?
+  chainSequence Int      @default(0)
+  updatedAt     DateTime @updatedAt
+
+  @@map("security_fusion_receipt_chain_heads")
+}
+
+model SecurityFusionCollector {
+  id                    String    @id
+  displayName           String
+  credentialFingerprint String
+  allowedSourcesJson    String    @default("[]")
+  schemaVersion         String    @default("1.0")
+  dataClassification    String    @default("restricted")
+  status                String    @default("active")
+  lastReceiptAt         DateTime?
+  lastSuccessAt         DateTime?
+  lastErrorAt           DateTime?
+  lastError             String?
+  revokedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([status, lastReceiptAt])
+  @@map("security_fusion_collectors")
+}
+
+model SecurityFusionNonce {
+  nonce       String   @id
+  collectorId String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("security_fusion_nonces")
+}
+
+model SecurityFusionInvestigation {
+  id        String   @id @default(cuid())
+  caseId    String
+  revision  Int
+  authorId  String
+  draftJson String
+  createdAt DateTime @default(now())
+
+  @@unique([caseId, revision])
+  @@index([caseId, createdAt])
+  @@map("security_fusion_investigations")
+}
+
+/// Revisioned, digest-bound security assessment. Magnus remains inventory
+/// authority; this row records the Security Fusion interpretation and evidence.
+model SecurityFusionAssurancePacket {
+  id              String   @id @default(cuid())
+  caseId          String
+  kind            String
+  revision        Int
+  actorId         String
+  inputSha256     String
+  caseStateSha256 String
+  packetJson      String
+  packetSha256    String
+  createdAt       DateTime @default(now())
+
+  @@unique([caseId, kind, revision])
+  @@index([caseId, kind, createdAt])
+  @@index([packetSha256])
+  @@map("security_fusion_assurance_packets")
+}
+
+model SecurityFusionAction {
+  id                String    @id @default(cuid())
+  caseId            String
+  nodeId            String
+  kind              String
+  serviceName       String?
+  isolationMinutes  Int?
+  rationale         String
+  rollbackPlan      String
+  previewJson       String
+  previewSha256     String
+  status            String    @default("previewed")
+  requestedBy       String
+  approvedBy        String?
+  approvalTokenHash String?
+  approvalExpiresAt DateTime?
+  executedAt        DateTime?
+  verificationDeadline DateTime?
+  resultJson        String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([caseId, createdAt])
+  @@index([status, approvalExpiresAt])
+  @@map("security_fusion_actions")
+}
+
+model SecurityFusionActionApproval {
+  id            String    @id @default(cuid())
+  actionId      String    @unique
+  previewSha256 String
+  planRevision  Int       @default(1)
+  planJson      String?
+  planSha256    String?
+  tokenHash     String
+  status        String    @default("pending")
+  requestedBy   String
+  decidedBy     String?
+  expiresAt     DateTime
+  decidedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@map("security_fusion_action_approvals")
+}
+
+/// Historical external approval decision. The assertion is retained by
+/// digest only; raw Telegram identities and signatures never enter this DB.
+model SecurityFusionTelegramDecision {
+  id                 String   @id @default(cuid())
+  decisionId         String   @unique
+  actionId           String   @unique
+  proposalId         String   @unique
+  proposalRevision   Int
+  assertionVersion   Int
+  planSha256         String
+  decision           String
+  assertionSha256    String
+  actorBindingSha256 String
+  executionId        String?  @unique
+  decidedAt          DateTime
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("security_fusion_telegram_decisions")
+}
+
+model SecurityFusionCommandOutbox {
+  id              String    @id @default(cuid())
+  actionId        String
+  operation       String
+  actorId         String
+  approvalExecutionId String?
+  status          String    @default("pending")
+  remoteCommandId String?
+  attempts        Int       @default(0)
+  nextAttemptAt   DateTime  @default(now())
+  leaseExpiresAt  DateTime?
+  lastError       String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  dispatchedAt    DateTime?
+
+  @@unique([actionId, operation])
+  @@unique([remoteCommandId])
+  @@index([status, nextAttemptAt])
+  @@map("security_fusion_command_outbox")
+}
+
+model SecurityFusionDelivery {
+  id          String   @id @default(cuid())
+  caseId      String
+  revisionKey String   @unique
+  channel     String
+  status      String
+  externalId  String?
+  error       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([caseId, createdAt])
+  @@map("security_fusion_deliveries")
+}
+
+
+model SecurityTarget {
+ id String @id
+ name String
+ hostname String
+ baseUrl String
+ tags String
+ metadata String
+ syncedAt DateTime
+ @@map("security_targets")
+}
+model SecurityExecution {
+ id String @id
+ actionId String
+ operation String
+ nodeId String
+ status String
+ resultJson String @default("{}")
+ startedAt DateTime @default(now())
+ completedAt DateTime?
+ @@unique([actionId, operation])
+ @@map("security_executions")
+}
+
+/// Product-owned one-use decision. Legacy signed decisions remain in their original table.
+model SecurityFusionApprovalDecision {
+  id String @id
+  actionId String @unique
+  source String
+  decision String
+  actorId String
+  planSha256 String
+  previewSha256 String
+  executionId String? @unique
+  decidedAt DateTime @default(now())
+  expiresAt DateTime
+  @@map("security_fusion_approval_decisions")
+}
