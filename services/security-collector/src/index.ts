@@ -149,16 +149,28 @@ function signedHeaders(raw: string): Record<string, string> {
 
 async function flush(): Promise<void> {
   if (queue.size === 0) return;
-  const events = queue.take(100);
-  const batch: SecurityFusionEventBatch = {
-    schemaVersion: "1.0",
+  const pendingCheckpoints = Object.fromEntries(cursors);
+  const savedCheckpoints = Object.fromEntries(committedCursors);
+  const envelope = {
+    schemaVersion: "1.0" as const,
     collectorId,
     sentAt: new Date().toISOString(),
+    events: [],
+  };
+  const overhead = Math.max(
+    ...[pendingCheckpoints, savedCheckpoints].map((checkpoints) =>
+      Buffer.byteLength(JSON.stringify({ ...envelope, checkpoints })),
+    ),
+  );
+  const events = queue.take(100, 262_144 - overhead + 2);
+  if (!events.length)
+    throw new Error(
+      "Queued event exceeds the signed ingestion byte budget; checkpoint held",
+    );
+  const batch: SecurityFusionEventBatch = {
+    ...envelope,
     events,
-    checkpoints:
-      queue.size === 0
-        ? Object.fromEntries(cursors)
-        : Object.fromEntries(committedCursors),
+    checkpoints: queue.size === 0 ? pendingCheckpoints : savedCheckpoints,
   };
   const raw = JSON.stringify(batch);
   try {

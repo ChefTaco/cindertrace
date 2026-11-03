@@ -178,8 +178,17 @@ export class BoundedSecurityEventQueue {
     return "accepted";
   }
 
-  public take(limit: number): SecurityFusionEvent[] {
-    const events = this.#items.splice(0, limit);
+  public take(limit: number, maxBytes = Infinity): SecurityFusionEvent[] {
+    let count = 0,
+      bytes = 2;
+    while (count < Math.min(limit, this.#items.length)) {
+      const nextBytes =
+        Buffer.byteLength(JSON.stringify(this.#items[count])) + (count ? 1 : 0);
+      if (bytes + nextBytes > maxBytes) break;
+      bytes += nextBytes;
+      count++;
+    }
+    const events = this.#items.splice(0, count);
     for (const event of events) this.#queued.delete(event.eventId);
     return events;
   }

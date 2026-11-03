@@ -127,6 +127,34 @@ describe("security collector runtime guards", () => {
 });
 
 describe("bounded event queue", () => {
+  it("drains large valid UTF-8 observations within the signed batch byte limit without losing order", () => {
+    const queue = new BoundedSecurityEventQueue(100);
+    for (let i = 0; i < 100; i++)
+      queue.enqueue({
+        ...event(String(i)),
+        attributes: { detail: "界".repeat(4000) },
+      });
+    const ids: string[] = [];
+    const metadata = {
+      schemaVersion: "1.0",
+      collectorId: "fixture",
+      sentAt: new Date().toISOString(),
+      checkpoints: { hive: "界".repeat(2000) },
+    };
+    const overhead = Buffer.byteLength(
+      JSON.stringify({ ...metadata, events: [] }),
+    );
+    while (queue.size) {
+      const events = queue.take(100, 262_144 - overhead + 2);
+      expect(events.length).toBeGreaterThan(0);
+      expect(events.length).toBeLessThan(100);
+      expect(
+        Buffer.byteLength(JSON.stringify({ ...metadata, events })),
+      ).toBeLessThanOrEqual(262_144);
+      ids.push(...events.map((row) => row.eventId));
+    }
+    expect(ids).toEqual(Array.from({ length: 100 }, (_, i) => String(i)));
+  });
   it("deduplicates queued events and never exceeds the ingress limit", () => {
     const queue = new BoundedSecurityEventQueue(2, 4);
     expect(queue.enqueue(event("a"))).toBe("accepted");
