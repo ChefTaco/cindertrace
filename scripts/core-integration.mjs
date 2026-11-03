@@ -244,6 +244,136 @@ try {
     }),
     1,
   );
+  process.env.SECURITY_WRITES_ENABLED = "false";
+  process.env.SECURITY_DISPATCH_ENABLED = "true";
+  const { dispatchSecurityFusionOutbox } =
+    await import("../services/security-fusion/dist/services/security-fusion-outbox.js");
+  assert.equal(await dispatchSecurityFusionOutbox(), 0);
+  assert.equal(
+    (
+      await db.securityFusionCommandOutbox.findFirstOrThrow({
+        where: { actionId: fixture.id },
+      })
+    ).status,
+    "pending",
+  );
+  // The product owns restart verification after the Magnus extraction. Exercise
+  // persistent transitions against PostgreSQL and request-bound signed health.
+  process.env.SECURITY_WRITES_ENABLED = "true";
+  process.env.SECURITY_DISPATCH_ENABLED = "false";
+  const { bridgeSignature } =
+    await import("../packages/integrations/dist/index.js");
+  const { reconcileRestartVerification } =
+    await import("../services/security-fusion/dist/services/security-fusion-outbox.js");
+  await db.securityTarget.create({
+    data: {
+      id: "fixture-node",
+      name: "Synthetic application",
+      hostname: "app-1.example.com",
+      baseUrl: "https://node.example.com:4100",
+      tags: "[]",
+      metadata: "{}",
+      syncedAt: new Date(),
+    },
+  });
+  let healthStatus = "active";
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const path = new URL(input).pathname;
+    assert.equal(init.method, "GET");
+    assert.equal(path, "/response/targets/fixture-node/health");
+    const body = JSON.stringify({
+        data: {
+          responseCapable: true,
+          services: [{ name: "fixture", status: healthStatus }],
+        },
+      }),
+      headers = new Headers(init.headers);
+    return new Response(body, {
+      headers: {
+        "x-cindertrace-signature": bridgeSignature(
+          process.env.MAGNUS_RESPONSE_SECRET,
+          "RESPONSE",
+          path,
+          headers.get("x-cindertrace-time"),
+          headers.get("x-cindertrace-nonce"),
+          body,
+        ),
+      },
+    });
+  };
+  try {
+    const make = async (deadline) => {
+      const action = await db.securityFusionAction.create({
+        data: {
+          caseId,
+          nodeId: "fixture-node",
+          kind: "service_restart",
+          serviceName: "fixture.service",
+          rationale: "Synthetic restart verification",
+          rollbackPlan: "Inspect synthetic health",
+          previewJson: "{}",
+          previewSha256: "d".repeat(64),
+          status: "verifying",
+          requestedBy: "fixture-admin",
+          verificationDeadline: deadline,
+        },
+      });
+      await db.securityExecution.create({
+        data: {
+          id: randomUUID(),
+          actionId: action.id,
+          operation: "execute",
+          nodeId: "fixture-node",
+          status: "completed",
+          completedAt: new Date(Date.now() - 300000),
+        },
+      });
+      return action;
+    };
+    const recovered = await make(new Date(Date.now() - 60000));
+    await reconcileRestartVerification();
+    assert.equal(
+      (
+        await db.securityFusionAction.findUniqueOrThrow({
+          where: { id: recovered.id },
+        })
+      ).status,
+      "succeeded",
+    );
+    healthStatus = "failed";
+    const unhealthy = await make(new Date(Date.now() + 180000));
+    await reconcileRestartVerification();
+    assert.equal(
+      (
+        await db.securityFusionAction.findUniqueOrThrow({
+          where: { id: unhealthy.id },
+        })
+      ).status,
+      "verifying",
+    );
+    await db.securityFusionAction.update({
+      where: { id: unhealthy.id },
+      data: { verificationDeadline: new Date(Date.now() - 1) },
+    });
+    await reconcileRestartVerification();
+    assert.equal(
+      (
+        await db.securityFusionAction.findUniqueOrThrow({
+          where: { id: unhealthy.id },
+        })
+      ).status,
+      "failed",
+    );
+    assert.equal(
+      await db.securityFusionCaseActivity.count({
+        where: { caseId, kind: "containment.succeeded" },
+      }),
+      1,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
   console.log(
     JSON.stringify({
       standalone: true,
@@ -256,6 +386,8 @@ try {
       concurrentApprovalConsumedOnce: true,
       wrongPlanRejected: true,
       dispatchDisabled: true,
+      globalWritePausePreventsDispatch: true,
+      restartVerificationRecovery: true,
     }),
   );
 } finally {

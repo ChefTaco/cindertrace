@@ -21,15 +21,19 @@ const { getDb, disconnectDb } = await import("./db/index.js");
 const { syncTargets } = await import("./services/targets.js");
 const { startSecurityFusionRetention, stopSecurityFusionRetention } =
   await import("./services/security-fusion-service.js");
-const { reconcileSecurityFusionEvidence } = await import(
-  "./services/security-fusion-evidence-integrity.js"
-);
+const { reconcileSecurityFusionEvidence } =
+  await import("./services/security-fusion-evidence-integrity.js");
 const {
   startSecurityFusionOutboxDispatcher,
   stopSecurityFusionOutboxDispatcher,
 } = await import("./services/security-fusion-outbox.js");
 await getDb().$queryRaw`SELECT 1`;
-if (process.env["SECURITY_WRITES_ENABLED"] === "true") await getDb().securityFusionReceiptChainHead.upsert({ where: { id: "security-fusion" }, create: { id: "security-fusion", chainSequence: 0 }, update: {} });
+if (process.env["SECURITY_WRITES_ENABLED"] === "true")
+  await getDb().securityFusionReceiptChainHead.upsert({
+    where: { id: "security-fusion" },
+    create: { id: "security-fusion", chainSequence: 0 },
+    update: {},
+  });
 if (process.env["SECURITY_WRITES_ENABLED"] === "true")
   await reconcileSecurityFusionEvidence();
 const listener = resolveListenerSecurity({
@@ -54,10 +58,14 @@ const server = serve({
       }
     : {}),
 });
-if (process.env["SECURITY_RETENTION_ENABLED"] === "true")
+if (
+  process.env["SECURITY_RETENTION_ENABLED"] === "true" &&
+  process.env["SECURITY_WRITES_ENABLED"] === "true"
+)
   startSecurityFusionRetention();
 startSecurityFusionOutboxDispatcher();
 const sync = () => {
+  if (process.env["SECURITY_WRITES_ENABLED"] !== "true") return;
   void syncTargets().catch(() =>
     console.error("Security inventory synchronization failed"),
   );

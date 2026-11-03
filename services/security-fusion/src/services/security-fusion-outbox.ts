@@ -8,7 +8,13 @@ import { validateStoredContainmentPlan } from "./senti-containment-approval.js";
 
 let busy = false;
 export async function dispatchSecurityFusionOutbox(): Promise<number> {
-  if (busy || process.env["SECURITY_DISPATCH_ENABLED"] !== "true" || !responseConfigured()) return 0;
+  if (
+    busy ||
+    process.env["SECURITY_WRITES_ENABLED"] !== "true" ||
+    process.env["SECURITY_DISPATCH_ENABLED"] !== "true" ||
+    !responseConfigured()
+  )
+    return 0;
   busy = true;
   try {
     const db = getDb();
@@ -40,20 +46,46 @@ export async function dispatchSecurityFusionOutbox(): Promise<number> {
         continue;
       }
       const [decision, approval] = await Promise.all([
-        row.operation === "execute" ? db.securityFusionApprovalDecision.findUnique({ where: { actionId: action.id } }) : Promise.resolve(null),
-        row.operation === "execute" ? db.securityFusionActionApproval.findUnique({ where: { actionId: action.id } }) : Promise.resolve(null),
+        row.operation === "execute"
+          ? db.securityFusionApprovalDecision.findUnique({
+              where: { actionId: action.id },
+            })
+          : Promise.resolve(null),
+        row.operation === "execute"
+          ? db.securityFusionActionApproval.findUnique({
+              where: { actionId: action.id },
+            })
+          : Promise.resolve(null),
       ]);
       let plan: ReturnType<typeof validateStoredContainmentPlan> | undefined;
-      try { if (approval) plan = validateStoredContainmentPlan(action, approval); } catch { /* changed plans stay blocked */ }
+      try {
+        if (approval) plan = validateStoredContainmentPlan(action, approval);
+      } catch {
+        /* changed plans stay blocked */
+      }
       if (row.operation === "execute") {
-        const approved = action.status === "dispatch_pending" && decision?.decision === "approve"
-          && Boolean(decision.executionId) && row.approvalExecutionId === decision.executionId
-          && decision.planSha256 === plan?.plan_sha256 && decision.previewSha256 === action.previewSha256
-          && approval?.status === "approved" && decision.expiresAt.getTime() > Date.now()
-          && decision.decidedAt.getTime() < decision.expiresAt.getTime()
-          && decision.expiresAt.getTime() <= (plan?.expires_at ?? 0)
-          && decision.actorId === action.approvedBy && row.actorId === action.approvedBy;
-        if (!approved) { await finish(row.id, row.actionId, "failed", "Execute blocked: no matching durable approval"); continue; }
+        const approved =
+          action.status === "dispatch_pending" &&
+          decision?.decision === "approve" &&
+          Boolean(decision.executionId) &&
+          row.approvalExecutionId === decision.executionId &&
+          decision.planSha256 === plan?.plan_sha256 &&
+          decision.previewSha256 === action.previewSha256 &&
+          approval?.status === "approved" &&
+          decision.expiresAt.getTime() > Date.now() &&
+          decision.decidedAt.getTime() < decision.expiresAt.getTime() &&
+          decision.expiresAt.getTime() <= (plan?.expires_at ?? 0) &&
+          decision.actorId === action.approvedBy &&
+          row.actorId === action.approvedBy;
+        if (!approved) {
+          await finish(
+            row.id,
+            row.actionId,
+            "failed",
+            "Execute blocked: no matching durable approval",
+          );
+          continue;
+        }
       }
       let node;
       try {
@@ -67,7 +99,8 @@ export async function dispatchSecurityFusionOutbox(): Promise<number> {
         );
         continue;
       }
-      const commandId = row.operation === "execute" ? decision!.executionId! : randomUUID();
+      const commandId =
+        row.operation === "execute" ? decision!.executionId! : randomUUID();
       const claim = await db.$transaction(async (tx) => {
         const changed = await tx.securityFusionCommandOutbox.updateMany({
           where: { id: row.id, status: "pending" },
@@ -99,22 +132,45 @@ export async function dispatchSecurityFusionOutbox(): Promise<number> {
       if (!claim) continue;
       try {
         const request: ResponseRequest = {
-          version: 1, executionId: commandId, actionId: action.id, caseId: action.caseId,
-          operation: row.operation === "release" ? "release" : "execute", nodeId: node.id,
-          kind: action.kind as ResponseRequest["kind"], serviceName: action.serviceName,
-          isolationMinutes: action.isolationMinutes, previewSha256: action.previewSha256,
+          version: 1,
+          executionId: commandId,
+          actionId: action.id,
+          caseId: action.caseId,
+          operation: row.operation === "release" ? "release" : "execute",
+          nodeId: node.id,
+          kind: action.kind as ResponseRequest["kind"],
+          serviceName: action.serviceName,
+          isolationMinutes: action.isolationMinutes,
+          previewSha256: action.previewSha256,
           planSha256: plan?.plan_sha256 ?? action.previewSha256,
-          approvalId: row.operation === "execute" ? decision!.id : `release:${row.id}`,
-          approvedBy: row.actorId, expiresAt: row.operation === "execute" ? decision!.expiresAt.getTime() : Date.now() + 600000,
+          approvalId:
+            row.operation === "execute" ? decision!.id : `release:${row.id}`,
+          approvedBy: row.actorId,
+          expiresAt:
+            row.operation === "execute"
+              ? decision!.expiresAt.getTime()
+              : Date.now() + 600000,
         };
         // One POST only. A lost response leaves an unknown effect, never a replay.
-        const result = await magnusRequest("/execute", request) as {
-          commandId: string; actionId: string; nodeId: string; operation: string; planSha256: string;
-          exitCode: number; receiptSha256: string;
+        const result = (await magnusRequest("/execute", request)) as {
+          commandId: string;
+          actionId: string;
+          nodeId: string;
+          operation: string;
+          planSha256: string;
+          exitCode: number;
+          receiptSha256: string;
         };
-        if (result.commandId !== commandId || result.actionId !== action.id || result.nodeId !== node.id
-          || result.operation !== row.operation || result.planSha256 !== request.planSha256
-          || !Number.isInteger(result.exitCode) || !/^[a-f0-9]{64}$/.test(result.receiptSha256)) throw new Error("Unbound execution receipt");
+        if (
+          result.commandId !== commandId ||
+          result.actionId !== action.id ||
+          result.nodeId !== node.id ||
+          result.operation !== row.operation ||
+          result.planSha256 !== request.planSha256 ||
+          !Number.isInteger(result.exitCode) ||
+          !/^[a-f0-9]{64}$/.test(result.receiptSha256)
+        )
+          throw new Error("Unbound execution receipt");
         const status =
           result.exitCode !== 0
             ? "failed"

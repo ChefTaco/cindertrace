@@ -1284,11 +1284,12 @@ export async function purgeSecurityFusion(now = new Date()): Promise<{
 let retentionTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startSecurityFusionRetention(): void {
-  if (retentionTimer) return;
+  if (retentionTimer || process.env['SECURITY_WRITES_ENABLED'] !== 'true') return;
   void purgeSecurityFusion().catch((error: unknown) =>
     console.error("[security-fusion] retention failed", error),
   );
   retentionTimer = setInterval(() => {
+    if (process.env['SECURITY_WRITES_ENABLED'] !== 'true') return;
     void purgeSecurityFusion().catch((error: unknown) =>
       console.error("[security-fusion] retention failed", error),
     );

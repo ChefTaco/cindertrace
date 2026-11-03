@@ -32,7 +32,11 @@ import { createContainmentPlan } from "./senti-containment-approval.js";
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("SECURITY_DISPATCH_ENABLED", "true");
-  vi.stubEnv("MAGNUS_RESPONSE_URL", "https://magnus.example.com/api/v1/security-integration/response");
+  vi.stubEnv("SECURITY_WRITES_ENABLED", "true");
+  vi.stubEnv(
+    "MAGNUS_RESPONSE_URL",
+    "https://magnus.example.com/api/v1/security-integration/response",
+  );
   vi.stubEnv("MAGNUS_RESPONSE_SECRET", "test-bridge-secret-".repeat(3));
   db.$transaction.mockImplementation(async (f) => f(db));
   db.securityFusionCommandOutbox.updateMany.mockResolvedValue({ count: 1 });
@@ -51,11 +55,18 @@ beforeEach(() => {
     approvalExpiresAt: new Date(Date.now() + 10 * 60_000),
     approvedBy: "telegram:" + "a".repeat(64),
   };
-  const plan = createContainmentPlan(actionFixture, actionFixture.approvalExpiresAt);
+  const plan = createContainmentPlan(
+    actionFixture,
+    actionFixture.approvalExpiresAt,
+  );
   const { plan_sha256: planSha256, ...storedPlan } = plan;
-  db.securityFusionAction.findUnique.mockImplementation(async () => actionFixture);
+  db.securityFusionAction.findUnique.mockImplementation(
+    async () => actionFixture,
+  );
   decisionFixture = {
-    id: "decision-1", actorId: actionFixture.approvedBy, previewSha256: actionFixture.previewSha256,
+    id: "decision-1",
+    actorId: actionFixture.approvedBy,
+    previewSha256: actionFixture.previewSha256,
     assertionVersion: 2,
     decision: "approve",
     proposalId: "containment:a",
@@ -66,7 +77,9 @@ beforeEach(() => {
     decidedAt: new Date(Date.now() - 1000),
     expiresAt: new Date(Date.now() + 5 * 60_000),
   };
-  db.securityFusionApprovalDecision.findUnique.mockImplementation(async () => decisionFixture);
+  db.securityFusionApprovalDecision.findUnique.mockImplementation(
+    async () => decisionFixture,
+  );
   approvalFixture = {
     actionId: "a",
     previewSha256: actionFixture.previewSha256,
@@ -76,7 +89,9 @@ beforeEach(() => {
     planSha256,
     expiresAt: actionFixture.approvalExpiresAt,
   };
-  db.securityFusionActionApproval.findUnique.mockImplementation(async () => approvalFixture);
+  db.securityFusionActionApproval.findUnique.mockImplementation(
+    async () => approvalFixture,
+  );
 });
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -111,8 +126,15 @@ describe("one-shot dispatch", () => {
     );
   });
   it("blocks legacy execute records without a product approval decision", async () => {
-    const row = { id: "legacy", actionId: "a", operation: "execute", actorId: "admin" };
-    db.securityFusionCommandOutbox.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([row]);
+    const row = {
+      id: "legacy",
+      actionId: "a",
+      operation: "execute",
+      actorId: "admin",
+    };
+    db.securityFusionCommandOutbox.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([row]);
     db.securityFusionCommandOutbox.findUnique.mockResolvedValue(row);
     db.securityFusionApprovalDecision.findUnique.mockResolvedValue(null);
     const send = vi.fn();
@@ -120,33 +142,78 @@ describe("one-shot dispatch", () => {
     await dispatchSecurityFusionOutbox();
     expect(send).not.toHaveBeenCalled();
     expect(db.securityFusionCommandOutbox.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "failed",
-        lastError: "Execute blocked: no matching durable approval" }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "failed",
+          lastError: "Execute blocked: no matching durable approval",
+        }),
+      }),
     );
   });
   it.each([
-    ["changed target", () => { actionFixture = { ...actionFixture, nodeId: "other" }; }],
-    ["changed execution binding", () => { decisionFixture = { ...decisionFixture, executionId: "other-execution" }; }],
-    ["expired permission", () => { decisionFixture = { ...decisionFixture,
-      decidedAt: new Date(Date.now() - 120000), expiresAt: new Date(Date.now() - 60000) }; }],
+    [
+      "changed target",
+      () => {
+        actionFixture = { ...actionFixture, nodeId: "other" };
+      },
+    ],
+    [
+      "changed execution binding",
+      () => {
+        decisionFixture = {
+          ...decisionFixture,
+          executionId: "other-execution",
+        };
+      },
+    ],
+    [
+      "expired permission",
+      () => {
+        decisionFixture = {
+          ...decisionFixture,
+          decidedAt: new Date(Date.now() - 120000),
+          expiresAt: new Date(Date.now() - 60000),
+        };
+      },
+    ],
   ])("blocks execute with %s", async (_label, mutate) => {
-    const row = { id: "mismatch", actionId: "a", operation: "execute",
-      actorId: "telegram:" + "a".repeat(64), approvalExecutionId: "00000000-0000-4000-8000-000000000001" };
+    const row = {
+      id: "mismatch",
+      actionId: "a",
+      operation: "execute",
+      actorId: "telegram:" + "a".repeat(64),
+      approvalExecutionId: "00000000-0000-4000-8000-000000000001",
+    };
     mutate();
-    db.securityFusionCommandOutbox.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([row]);
+    db.securityFusionCommandOutbox.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([row]);
     db.securityFusionCommandOutbox.findUnique.mockResolvedValue(row);
-    const send = vi.fn();vi.stubGlobal("fetch", send);
+    const send = vi.fn();
+    vi.stubGlobal("fetch", send);
     await dispatchSecurityFusionOutbox();
     expect(send).not.toHaveBeenCalled();
     expect(db.securityFusionCommandOutbox.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "failed" }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "failed" }),
+      }),
     );
   });
   it("preserves unconditional emergency release without an approval decision", async () => {
-    const row = { id: "release", actionId: "a", operation: "release", actorId: "admin" };
-    db.securityFusionCommandOutbox.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([row]);
+    const row = {
+      id: "release",
+      actionId: "a",
+      operation: "release",
+      actorId: "admin",
+    };
+    db.securityFusionCommandOutbox.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([row]);
     db.securityFusionCommandOutbox.findUnique.mockResolvedValue(row);
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("bounded fixture")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("bounded fixture")),
+    );
     await dispatchSecurityFusionOutbox();
     expect(db.securityFusionApprovalDecision.findUnique).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledTimes(1);

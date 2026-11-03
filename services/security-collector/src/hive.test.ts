@@ -10,6 +10,23 @@ const row = (id: string) => ({
   eventType: "auth.failure",
 });
 describe("public Hive security export contract", () => {
+  it("accepts an IAM API base URL without duplicating its version prefix", async () => {
+    const calls: string[] = [];
+    await collectHiveSecurity({
+      iamUrl: "https://iam.example.com/api/v1",
+      clientId: "security-exporter",
+      secret: "fixture-oauth",
+      enqueue: () => true,
+      request: async (input) => {
+        const path = new URL(input).pathname;
+        calls.push(path);
+        return path === "/api/v1/oauth/token"
+          ? result({ access_token: "fixture-access" })
+          : result({ events: [], total: 0 });
+      },
+    });
+    expect(calls).toEqual(["/api/v1/oauth/token", "/api/v1/audit"]);
+  });
   it("paginates a fixed audit window and recovers a legacy Router cursor with scoped OAuth", async () => {
     const calls: URL[] = [],
       events: unknown[] = [];
@@ -28,7 +45,7 @@ describe("public Hive security export contract", () => {
       request: async (input, init) => {
         const url = new URL(input);
         calls.push(url);
-        if (url.pathname === "/oauth/token") {
+        if (url.pathname === "/api/v1/oauth/token") {
           expect(String(init?.body)).toContain(
             "iam%3Aaudit%3Aread+router%3Asecurity-events%3Aread",
           );
@@ -76,7 +93,7 @@ describe("public Hive security export contract", () => {
         secret: "fixture-oauth",
         enqueue: () => false,
         request: async (input) =>
-          new URL(input).pathname === "/oauth/token"
+          new URL(input).pathname === "/api/v1/oauth/token"
             ? result({ access_token: "fixture-access" })
             : result({ events: [row("example")], total: 1 }),
       }),

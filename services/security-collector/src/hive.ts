@@ -36,7 +36,8 @@ export async function collectHiveSecurity(options: {
   const start =
     prior.iamThrough ?? new Date(now.getTime() - 15 * 60000).toISOString();
   const base = options.iamUrl.replace(/\/$/, "");
-  const tokenResponse = await request(base + "/oauth/token", {
+  const api = base.endsWith("/api/v1") ? base : base + "/api/v1";
+  const tokenResponse = await request(api + "/oauth/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -62,7 +63,7 @@ export async function collectHiveSecurity(options: {
       throw new Error(
         "Hive audit backlog exceeds one bounded poll; checkpoint held",
       );
-    const url = new URL(base + "/api/v1/audit");
+    const url = new URL(api + "/audit");
     url.search = new URLSearchParams({
       limit: "200",
       page: String(page),
