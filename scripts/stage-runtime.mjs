@@ -97,6 +97,12 @@ function visit(path) {
   }
 }
 copy(join(root, "package.json"), join(destination, "package.json"));
+for (const name of ["LICENSE", "NOTICE"])
+  copy(join(root, name), join(destination, name));
+copy(
+  join(root, "apps/security-console/src/app/fonts/OFL.txt"),
+  join(destination, "apps/security-console/src/app/fonts/OFL.txt"),
+);
 for (const workspace of workspaces) {
   const path = join(root, workspace);
   copy(

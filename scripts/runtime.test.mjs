@@ -24,6 +24,9 @@ test("runtime staging preserves nested versions and traced shims while excluding
   try {
     pkg(".", { name: "fixture-root", version: "0.1.0", type: "module" });
     file("release.json", JSON.stringify({ product: "cindertrace", layoutVersion: 1, schemaProfile: "cindertrace-v1" }));
+    file("LICENSE", "Synthetic Apache license fixture");
+    file("NOTICE", "Synthetic attribution fixture");
+    file("apps/security-console/src/app/fonts/OFL.txt", "Synthetic font license fixture");
     for (const name of [
       "apps/security-console",
       "services/security-fusion",
@@ -86,6 +89,8 @@ test("runtime staging preserves nested versions and traced shims while excluding
       stdio: "pipe",
     });
     const output = join(root, "artifacts/runtime");
+    for (const name of ["LICENSE", "NOTICE", "apps/security-console/src/app/fonts/OFL.txt"])
+      assert.equal(readFileSync(join(output, name), "utf8"), readFileSync(join(root, name), "utf8"));
     assert.equal(
       JSON.parse(
         readFileSync(
