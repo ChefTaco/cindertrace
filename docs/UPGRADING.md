@@ -154,3 +154,8 @@ Maintainers must preserve versioned backup schema profiles, publish exact archiv
 and candidate-tree digests, and review rollback compatibility with every migration.
 Do not change a previously applied migration or an older schema profile to make a
 new release pass.
+
+The investigation lab release adds schema profile `cindertrace-v2` and declares
+`rollbackCompatible=false`. Its lab tables cannot be removed by rolling back
+application code. Prepare a verified restore and review the target schema before
+production cutover; use a forward fix or separately reviewed reconciliation.

@@ -67,3 +67,12 @@ describe("scoped Cindertrace agent adapter", () => {
     await expect(client.events()).rejects.toThrow("limit exceeded");
   });
 });
+it('uses a third independent credential for lab progression and exposes no approval method', async () => {
+  const request = vi.fn(async () => new Response('{"success":true,"data":{}}'));
+  const client = new CindertraceClient({url: 'https://security.example.com', readToken: 'fixture-read', draftToken: 'fixture-draft', labControlToken: 'fixture-control', fetchImpl: request as typeof fetch});
+  await client.advanceLab('run/one', {stage: 1, evidenceSha256: 'a'.repeat(64)});
+  expect(request.mock.calls[0]).toEqual([expect.stringContaining('/lab/runs/run%2Fone/advance'), expect.objectContaining({headers: expect.objectContaining({authorization: 'Bearer fixture-control'})})]);
+  expect('approveSimulation' in client).toBe(false);
+  const readOnly = new CindertraceClient({url: 'https://security.example.com', readToken: 'fixture-read', fetchImpl: request as typeof fetch});
+  await expect(readOnly.advanceLab('run', {stage: 1, evidenceSha256: 'a'.repeat(64)})).rejects.toThrow('lab-control');
+});

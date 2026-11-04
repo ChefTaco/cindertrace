@@ -1,3 +1,6 @@
+import { decodeRouteSegment } from "@/lib/route-segment";
+import { LabCase } from "@/components/security-fusion/lab-case";
+import type { LabRun, LabComparison } from "@cindertrace/contracts";
 import {CaseWorkflow} from "@/components/security-fusion/case-workflow";
 import {
   EvidenceBraid,
@@ -13,6 +16,7 @@ import { notFound } from "next/navigation";
 import { ContainmentPanel } from "@/components/security-fusion/containment-panel";
 
 interface CaseDetail {
+  labRunId: string | null;
   responseAvailable: boolean;
   canApprove: boolean;
   approvalMode: "console" | "external";
@@ -46,25 +50,30 @@ export default async function CasePage({
 }: {
   params: Promise<{ caseId: string }>;
 }): Promise<React.ReactElement> {
-  const { caseId } = await params;
+  const caseId = decodeRouteSegment((await params).caseId);
   const detail = await fusionFetch<CaseDetail>(
     `cases/${encodeURIComponent(caseId)}`,
   );
   if (!detail) notFound();
+  const lab = detail.labRunId ? await fusionFetch<LabRun>(`lab/runs/${encodeURIComponent(detail.labRunId)}`) : null;
+  const comparison = lab?.status === "completed" ? await fusionFetch<LabComparison>(`lab/runs/${encodeURIComponent(lab.id)}/comparison`) : null;
   return (
     <main className="p-5 lg:p-7">
       <FusionHeader
-        eyebrow={`${detail.case.severity} · ${Math.round(detail.case.confidence * 100)}% confidence`}
+        eyebrow={`${detail.case.severity} · ${Math.round(detail.case.confidence * 100)}% ${lab ? "correlation confidence" : "confidence"}`}
         title={detail.case.title}
         copy={detail.case.summary}
       />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <section>
+        <section className="min-w-0">
           <h2 className="mb-3 text-xs font-bold uppercase tracking-[.2em] text-text-muted">
             Evidence braid
           </h2>
           <EvidenceBraid events={detail.events} />
-          <CaseWorkflow caseId={detail.case.id} eventId={detail.events.at(-1)?.id} />
+          {lab ? <>
+            <LabCase key={`${lab.id}:${lab.stage}:${lab.latestRevision}:${lab.status}`} run={lab} comparison={comparison} />
+            <CaseWorkflow caseId={detail.case.id} eventId={detail.events.at(-1)?.id} preserveOnly />
+          </> : <CaseWorkflow caseId={detail.case.id} eventId={detail.events.at(-1)?.id} />}
           <section className="mt-6 space-y-3">
             <h2 className="text-xs uppercase tracking-widest text-text-muted">Saved investigations</h2>
             {detail.investigations.length===0?<p className="text-xs text-text-muted">No investigation drafts yet.</p>:detail.investigations.map(item=><article key={item.id} className="space-y-2 border border-border/60 p-4 text-sm text-text">
@@ -79,7 +88,7 @@ export default async function CasePage({
             {detail.evidence.map(item=><p key={item.id} className="break-all border border-border/60 p-3 font-mono text-xs text-text-muted">{item.sha256}</p>)}
           </section>
         </section>
-        <aside className="space-y-4">
+        <aside className="min-w-0 space-y-4">
           <section className="border border-border/60 p-4">
             <h2 className="font-mono text-[10px] uppercase tracking-widest text-primary">
               Affected entities
@@ -101,7 +110,7 @@ export default async function CasePage({
               ))}
             </ol>
           </section>
-          <ContainmentPanel available={detail.responseAvailable} canApprove={detail.canApprove} approvalMode={detail.approvalMode} caseId={detail.case.id} actions={detail.actions} />
+          {!lab && <ContainmentPanel available={detail.responseAvailable} canApprove={detail.canApprove} approvalMode={detail.approvalMode} caseId={detail.case.id} actions={detail.actions} />}
         </aside>
       </div>
     </main>

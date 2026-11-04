@@ -16,11 +16,11 @@ const TABS = [
 ] as const;
 
 /** Section tabs with a glowing underline on the active route (CSS only). */
-export function FusionNav(): React.ReactElement {
+export function FusionNav({labEnabled = false}: {labEnabled?: boolean}): React.ReactElement {
   const pathname = usePathname();
   return (
     <nav aria-label="Security Fusion" className="-mb-px flex flex-wrap gap-1 text-[11px] uppercase tracking-wider">
-      {TABS.map((label, i) => {
+      {[...TABS, ...(labEnabled ? ["Lab"] : [])].map((label, i) => {
         const href = `/security-fusion${i ? "/" + label.toLowerCase() : ""}`;
         const active = i === 0 ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
         return (

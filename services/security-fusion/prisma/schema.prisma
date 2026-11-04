@@ -431,3 +431,56 @@ model SecurityFusionApprovalDecision {
   expiresAt DateTime
   @@map("security_fusion_approval_decisions")
 }
+
+/// Disposable synthetic investigation state; never a response execution authority.
+model SecurityFusionLabRun {
+  id             String   @id
+  caseId         String   @unique
+  activeSlot     String?  @unique
+  status         String   @default("active")
+  stage          Int      @default(1)
+  scenarioVersion Int     @default(1)
+  rubricVersion  Int      @default(1)
+  scenarioSha256 String
+  rubricSha256   String
+  evidenceSha256 String
+  evidenceIdsJson String  @default("[]")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("security_fusion_lab_runs")
+}
+
+model SecurityFusionLabCheckpoint {
+  id              String   @id @default(cuid())
+  runId           String
+  investigationId String   @unique
+  revision        Int
+  stage           Int
+  evidenceSha256  String
+  evidenceIdsJson String
+  assessmentJson  String
+  evaluationJson  String
+  authorId        String
+  createdAt       DateTime @default(now())
+
+  @@unique([runId, revision])
+  @@index([runId, stage])
+  @@map("security_fusion_lab_checkpoints")
+}
+
+model SecurityFusionLabSimulation {
+  id           String   @id @default(cuid())
+  runId        String
+  revision     Int
+  status       String   @default("pending")
+  planJson     String
+  planSha256   String
+  expiresAt    DateTime
+  decidedBy    String?
+  decidedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([runId, status])
+  @@map("security_fusion_lab_simulations")
+}

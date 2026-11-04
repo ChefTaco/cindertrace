@@ -23,7 +23,7 @@ assert.equal(
 );
 const source = resolve(import.meta.dirname, "..");
 const id = randomUUID();
-const root = join(source, "artifacts", "upgrade-test-" + id);
+const root = process.env.CINDERTRACE_UPGRADE_TEST_ROOT ? resolve(process.env.CINDERTRACE_UPGRADE_TEST_ROOT, "upgrade-test-" + id) : join(source, "artifacts", "upgrade-test-" + id);
 mkdirSync(root, { recursive: true, mode: 0o700 });
 const log = join(root, "rehearsal.private.log");
 const fixture = join(root, "installation");
@@ -88,6 +88,13 @@ try {
   }
   if (existsSync(join(source, ".private-terms")))
     cpSync(join(source, ".private-terms"), join(fixture, ".private-terms"));
+  // This rehearsal tests current-state rollback between identical schemas.
+  // The actual release blocks unreviewed rollback across the new lab migration.
+  const releaseFile = join(fixture, "release.json");
+  const fixtureRelease = JSON.parse(readFileSync(releaseFile, "utf8"));
+  fixtureRelease.rollbackCompatible = true;
+  fixtureRelease.notes = "Synthetic same-schema rollback rehearsal; not a publication decision.";
+  writeFileSync(releaseFile, JSON.stringify(fixtureRelease, null, 2) + "\n");
   await run(["git", "init", "-q"]);
   await run(["git", "config", "user.name", "Synthetic upgrade fixture"]);
   await run(["git", "config", "user.email", "operator@example.com"]);

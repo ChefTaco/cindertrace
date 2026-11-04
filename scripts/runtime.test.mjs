@@ -11,7 +11,7 @@ import {
   symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 test("runtime staging preserves nested versions and traced shims while excluding optional development peers", () => {
   const root = mkdtempSync(join(tmpdir(), "runtime-fixture-"));
@@ -40,7 +40,7 @@ test("runtime staging preserves nested versions and traced shims while excluding
     pkg("services/security-fusion", {
       name: "fixture-api",
       version: "0.1.0",
-      dependencies: { specific: "2.0.0" },
+      dependencies: { specific: "2.0.0", "@cindertrace/contracts": "0.1.0" },
     });
     pkg("services/security-fusion/node_modules/specific", {
       name: "specific",
@@ -56,6 +56,17 @@ test("runtime staging preserves nested versions and traced shims while excluding
       "services/security-fusion/node_modules/specific/debug.js.map",
       "fixture debug metadata",
     );
+    mkdirSync(join(root, "node_modules/@cindertrace"), { recursive: true });
+    symlinkSync("../../packages/contracts", join(root, "node_modules/@cindertrace/contracts"), "dir");
+    pkg("apps/security-console", {name: "fixture-console", dependencies: {next: "1.0.0", "native-fixture": "1.0.0"}});
+    pkg("node_modules/next", {name: "next", version: "1.0.0"});
+    file("node_modules/next/unneeded.wasm", "Synthetic unused development asset");
+    pkg("node_modules/native-fixture", {name: "native-fixture", version: "1.0.0"});
+    file("node_modules/native-fixture/index.js", "export const fixture=true;");
+    for (const name of ["LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md"])
+      file("node_modules/native-fixture/" + name, "Synthetic attribution " + name);
+    for (const name of ["README.md", "index.d.ts", "index.d.mts", "index.d.cts"])
+      file("node_modules/native-fixture/" + name, "Synthetic development documentation");
     pkg("node_modules/specific", { name: "specific", version: "1.0.0" });
     pkg("node_modules/development-cli", {
       name: "development-cli",
@@ -72,6 +83,8 @@ test("runtime staging preserves nested versions and traced shims while excluding
       "core-integration.mjs",
       "recovery-integration.mjs",
       "demo.mjs",
+      "lab.mjs",
+      "lab-integration.mjs",
       "upgrade.mjs",
       "upgrade-policy.mjs",
       "upgrade-artifacts.mjs",
@@ -80,6 +93,8 @@ test("runtime staging preserves nested versions and traced shims while excluding
       "upgrade-native.mjs",
     ])
       file("scripts/" + name, "// fixture");
+    file("apps/security-console/scripts/stage.mjs", "export const DEPENDENCY_PACKAGES=['native-fixture'];");
+    cpSync(new URL("./runtime-dependencies.mjs", import.meta.url), join(root, "scripts/runtime-dependencies.mjs"));
     cpSync(
       new URL("./stage-runtime.mjs", import.meta.url),
       join(root, "scripts/stage-runtime.mjs"),
@@ -106,6 +121,17 @@ test("runtime staging preserves nested versions and traced shims while excluding
       existsSync(join(output, "console/node_modules/traced-shim/index.js")),
     );
     assert(!existsSync(join(output, "node_modules/development-cli")));
+    assert(!existsSync(join(output, "node_modules/next")));
+    for (const name of ["LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md"])
+      assert.equal(readFileSync(join(output, "node_modules/native-fixture", name), "utf8"), readFileSync(join(root, "node_modules/native-fixture", name), "utf8"));
+    for (const name of ["README.md", "index.d.ts", "index.d.mts", "index.d.cts"])
+      assert(!existsSync(join(output, "node_modules/native-fixture", name)));
+    assert.equal(readFileSync(join(output, "node_modules/@cindertrace/contracts/dist/index.js"), "utf8"), "export const fixture=true;");
+    execFileSync(process.execPath, [resolve(import.meta.dirname, "check-private.mjs"), "--artifact", output], {stdio: "pipe"});
+    // Executable dependency content is always scanned; packaging never masks findings.
+    const credential = "ghp_" + "Z".repeat(40);
+    writeFileSync(join(output, "node_modules/native-fixture/index.js"), `export const fixture='${credential}';`);
+    assert.throws(() => execFileSync(process.execPath, [resolve(import.meta.dirname, "check-private.mjs"), "--artifact", output], {stdio: "pipe"}));
     assert(
       !existsSync(
         join(

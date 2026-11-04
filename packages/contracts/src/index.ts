@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { labAssessmentSchema } from './lab.js';
+export * from './lab.js';
 
 export const securityFusionSourceSchema = z.enum([
   'unifi_dns',
@@ -76,6 +78,7 @@ export const securityFusionSourceReportSchema = z.object({
 });
 
 export const securityFusionInvestigationDraftSchema = z.object({
+  lab: labAssessmentSchema.optional(),
   summary: z.string().min(1).max(4000),
   hypotheses: z.array(z.string().min(1).max(1000)).max(12),
   prioritizedChecks: z.array(z.string().min(1).max(1000)).max(20),

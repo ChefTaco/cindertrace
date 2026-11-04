@@ -14,7 +14,7 @@ services:
   postgres:
     image: postgres:18.6-bookworm@sha256:5c4783a8cc3f0074912164f94dfa1be4e043438f0f707cf968d7af9a0d31a2c8
     environment:
-      POSTGRES_DB: cindertrace
+      POSTGRES_DB: '${CINDERTRACE_DATABASE_NAME:-cindertrace}'
       POSTGRES_USER: cindertrace
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run npm run init first}
     volumes: [postgres:/var/lib/postgresql]
@@ -51,7 +51,7 @@ services:
     working_dir: /app/console/apps/security-console
     command: [node, server-tls.mjs]
     environment: {PORT: '3444', HOSTNAME: '0.0.0.0'}
-    ports: ['127.0.0.1:3444:3444']
+    ports: ['127.0.0.1:${CINDERTRACE_CONSOLE_PORT:-3444}:3444']
     depends_on:
       api: {condition: service_healthy}
     healthcheck:

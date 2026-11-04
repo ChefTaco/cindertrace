@@ -115,6 +115,23 @@ try {
     }
     cursor = rows.at(-1).id;
   }
+  let labRunsVerified = 0;
+  const labTables = await db.$queryRaw`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'security_fusion_lab_%'`;
+  assert([0, 3].includes(labTables.length), "Incomplete lab schema in restored database");
+  for (const run of labTables.length ? await db.securityFusionLabRun.findMany() : []) {
+    const ids = JSON.parse(run.evidenceIdsJson);
+    const events = await db.securityFusionEvent.findMany({ where: { id: { in: ids } }, orderBy: { id: "asc" }, select: { id: true, integritySha256: true } });
+    assert.equal(events.length, ids.length, "Lab snapshot has missing observations");
+    assert.equal(createHash("sha256").update(canonical(events)).digest("hex"), run.evidenceSha256, "Lab snapshot digest differs");
+    const investigationIds = new Set((await db.securityFusionInvestigation.findMany({ where: { caseId: run.caseId }, select: { id: true } })).map(row => row.id));
+    for (const checkpoint of await db.securityFusionLabCheckpoint.findMany({ where: { runId: run.id } })) {
+      assert(investigationIds.has(checkpoint.investigationId), "Lab checkpoint lost its investigation revision");
+      assert.equal(JSON.parse(checkpoint.assessmentJson).evidenceSha256, checkpoint.evidenceSha256);
+    }
+    for (const simulation of await db.securityFusionLabSimulation.findMany({ where: { runId: run.id } }))
+      assert.equal(createHash("sha256").update(simulation.planJson).digest("hex"), simulation.planSha256, "Simulated plan digest differs");
+    labRunsVerified++;
+  }
   const audit = [];
   for (const day of await listAuditDays()) {
     const result = await verifyAuditIntegrity(day);
@@ -123,6 +140,7 @@ try {
   }
   console.log(
     JSON.stringify({
+      labRunsVerified,
       receipts: receipts.length,
       receiptHeadVerified: true,
       ledgerSignaturesVerified: ledgerRecords,

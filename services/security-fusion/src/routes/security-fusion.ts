@@ -1,3 +1,4 @@
+import { registerLabRoutes } from "./investigation-lab.js";
 import { decideAsAdmin } from "../services/approval-decisions.js";
 import { responseConfigured } from "../config/runtime.js";
 import { validateActionTarget } from "../services/targets.js";
@@ -424,6 +425,7 @@ securityFusionRouter.post("/ingest/source-status", async (c) => {
 
 securityFusionRouter.use("*", authMiddleware);
 securityFusionRouter.use("*", requirePermission("security-fusion:read"));
+registerLabRoutes(securityFusionRouter);
 securityFusionRouter.get("/audit", requireRole("ADMIN"), async (c) => {
   const date = c.req.query("date");
   if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date))
@@ -763,6 +765,7 @@ export async function loadSecurityFusionCaseDetail(
           expiresAt: row.expiresAt,
           restricted: true,
         })),
+    labRunId: (await getDb().securityFusionLabRun.findUnique({ where: { caseId }, select: { id: true } }))?.id ?? null,
     investigations: investigations.map((row) => ({
       ...row,
       draft: json(row.draftJson),

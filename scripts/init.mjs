@@ -7,7 +7,13 @@ const require = createRequire(
   new URL("../apps/security-console/package.json", import.meta.url),
 );
 const { hash } = require("argon2");
-const root = resolve(process.argv[2] ?? ".");
+const args = process.argv.slice(2);
+const lab = args.includes("--lab");
+if (args.some(arg => arg.startsWith("--") && arg !== "--lab") || args.filter(arg => arg !== "--lab").length > 1)
+  throw new Error("Usage: init.mjs [directory] [--lab]");
+const root = resolve(args.find(arg => arg !== "--lab") ?? ".");
+const labId = lab ? randomBytes(12).toString("hex") : undefined;
+const databaseName = lab ? `cindertrace_lab_${labId}` : "cindertrace";
 if (existsSync(resolve(root, ".env")))
   throw new Error(
     "Configuration already exists; refusing to overwrite secrets",
@@ -49,11 +55,13 @@ const env = {
   CINDERTRACE_UID: String(process.getuid?.() ?? 1000),
   CINDERTRACE_GID: String(process.getgid?.() ?? 1000),
   CINDERTRACE_STATE_DIR: "/state",
+  CINDERTRACE_DATABASE_NAME: databaseName,
+  CINDERTRACE_CONSOLE_PORT: lab ? "3445" : "3444",
   POSTGRES_PASSWORD: postgres,
-  DATABASE_URL: `postgresql://cindertrace:${postgres}@postgres:5432/cindertrace`,
+  DATABASE_URL: `postgresql://cindertrace:${postgres}@postgres:5432/${databaseName}`,
   REDIS_URL: "redis://redis:6379/0",
   CINDERTRACE_API_URL: "https://api:4101",
-  DASHBOARD_PUBLIC_ORIGIN: "https://localhost:3444",
+  DASHBOARD_PUBLIC_ORIGIN: lab ? "https://localhost:3445" : "https://localhost:3444",
   DASHBOARD_ADMIN_USERNAME: "admin",
   DASHBOARD_ADMIN_PASSWORD_HASH_B64: Buffer.from(adminHash).toString("base64"),
   SESSION_SECRET: session,
@@ -106,6 +114,21 @@ const env = {
   UI_SECURITY_LOG_PATH: "/state/ui-security.jsonl",
   SECURITY_BACKUP_STATUS_FILE: "/state/backup-status.json",
 };
+if (lab) {
+  for (const key of ["SECURITY_FUSION_INGEST_SECRET", "SECURITY_FUSION_COLLECTOR_CREDENTIALS_JSON"]) delete env[key];
+  Object.assign(env, {
+    CINDERTRACE_LAB_ENABLED: "true", CINDERTRACE_LAB_INSTALLATION_ID: labId,
+    CINDERTRACE_LAB_CONFIRM: "isolated-synthetic-installation", COMPOSE_PROJECT_NAME: `cindertrace-lab-${labId}`,
+    SECURITY_INGEST_ENABLED: "false", SECURITY_NOTIFICATIONS_ENABLED: "false",
+  });
+  const agent = { readToken: random(), draftToken: random(), labControlToken: random() };
+  Object.assign(env, {
+    SECURITY_PLUGIN_READ_DIGESTS_JSON: JSON.stringify({ "lab-agent": createHash("sha256").update(agent.readToken).digest("hex") }),
+    SECURITY_PLUGIN_DRAFT_TOKEN_SHA256: createHash("sha256").update(agent.draftToken).digest("hex"),
+    SECURITY_PLUGIN_LAB_CONTROL_TOKEN_SHA256: createHash("sha256").update(agent.labControlToken).digest("hex"),
+  });
+  writeFileSync(resolve(root, "state/lab-agent-credentials.json"), JSON.stringify(agent, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+}
 writeFileSync(
   resolve(root, ".env"),
   Object.entries(env)

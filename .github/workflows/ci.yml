@@ -26,6 +26,8 @@ jobs:
       - run: npm audit --omit=dev --audit-level=moderate
       - run: npm run stage -w @cindertrace/console
       - run: node scripts/check-private.mjs --artifact apps/security-console/dist
+      - run: node scripts/stage-runtime.mjs
+      - run: node scripts/check-private.mjs --artifact artifacts/runtime
   standalone:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -50,3 +52,27 @@ jobs:
       - name: Stop disposable installation
         if: always()
         run: docker compose down
+
+  lab:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
+      - run: npm run init -- --lab
+      - run: npm run lab -- up
+      - run: docker compose exec -T postgres createdb -U cindertrace cindertrace_test_lab_ci
+      - run: >-
+          docker compose exec -T -e CINDERTRACE_LAB_RECOVERY_TEST=true api node -e
+          'process.env.CINDERTRACE_TEST_DATABASE_URL=process.env.DATABASE_URL.replace(/\/[^/]+$/,"/cindertrace_test_lab_ci");import("./scripts/lab-integration.mjs")'
+      - run: npm exec -w @cindertrace/console -- playwright install --with-deps chromium
+      - run: CINDERTRACE_LAB_BROWSER_TEST_CONFIRM=disposable-installation npm run test:lab:browser
+      - name: Stop disposable lab
+        if: always()
+        run: npm run lab -- stop

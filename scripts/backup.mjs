@@ -27,7 +27,7 @@ import {
 import { join, resolve, relative, isAbsolute } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
 import { pipeline } from "node:stream/promises";
-import { securityTablesForProfile } from "../services/security-fusion/scripts/security-table-contract.mjs";
+import { securityTablesForProfile, securityTablesForArchive } from "../services/security-fusion/scripts/security-table-contract.mjs";
 const require = createRequire(
   new URL("../services/security-fusion/package.json", import.meta.url),
 );
@@ -183,7 +183,8 @@ try {
         "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename LIKE 'security_fusion_%' ORDER BY tablename",
       )
     ).rows.map((x) => x.tablename);
-    const profile = process.env.CINDERTRACE_SOURCE_PROFILE ?? "current";
+    const requestedProfile = process.env.CINDERTRACE_SOURCE_PROFILE ?? "cindertrace-v2";
+    const profile = requestedProfile === "current" ? "cindertrace-v2" : requestedProfile;
     if (
       JSON.stringify(observed) !==
       JSON.stringify(securityTablesForProfile(profile))
@@ -436,7 +437,7 @@ try {
       .sort();
     if (
       JSON.stringify(core) !==
-      JSON.stringify(securityTablesForProfile(manifest.profile))
+      JSON.stringify(securityTablesForArchive(manifest.profile, core))
     )
       throw new Error("Unreviewed recovery schema");
     if (

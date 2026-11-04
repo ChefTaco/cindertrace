@@ -9,6 +9,9 @@ vi.mock("../db/index.js", () => ({
 }));
 import { securityFusionRouter } from "./security-fusion.js";
 const reads = [
+  "/lab",
+  "/lab/runs/id",
+  "/lab/runs/id/comparison",
   "/overview",
   "/sources",
   "/source-registry",
@@ -21,6 +24,8 @@ const reads = [
 ];
 const evidence = ["/evidence", "/deletion-receipts", "/audit"];
 const mutations = [
+  ["POST", "/lab/runs/id/advance"],
+  ["POST", "/lab/runs/id/complete"],
   ["PATCH", "/cases/id"],
   ["POST", "/cases/id/investigations"],
   ["POST", "/cases/id/assurance/exposure"],
@@ -33,6 +38,9 @@ const mutations = [
   ["POST", "/actions/id/cancel"],
 ];
 const admin = [
+  "/lab/runs",
+  "/lab/runs/id/restart",
+  "/lab/runs/id/simulations/simulation/decision",
   "/source-registry/id/revoke",
   "/actions/id/release",
 ];
@@ -50,6 +58,7 @@ const endpoints = [
 afterEach(() => vi.unstubAllEnvs());
 for (const role of ["VIEWER", "OPERATOR", "ADMIN"]) {
   it.each(endpoints)(`${role} %s %s (%s)`, async (method, path, category) => {
+    vi.stubEnv("CINDERTRACE_LAB_ENABLED", path.startsWith("/lab") ? "true" : "false");
     vi.stubEnv("MAGNUS_RESPONSE_URL", "https://magnus.example.com/api/v1/security-integration/response");
     vi.stubEnv("MAGNUS_RESPONSE_SECRET", "test-bridge-secret-".repeat(3));
     vi.stubEnv("SECURITY_CONSOLE_TOKEN_SECRET", "x".repeat(64));
@@ -97,7 +106,7 @@ it("covers every authenticated endpoint class in the router", () => {
         ([method, path]) =>
           method === route.method &&
           path ===
-            route.path.replace(":eventId", "event").replaceAll(":id", "id"),
+            route.path.replace(":simulationId", "simulation").replace(":eventId", "event").replaceAll(":id", "id"),
       ),
     ).toBe(true);
 });

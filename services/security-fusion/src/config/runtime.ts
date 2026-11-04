@@ -1,13 +1,15 @@
+import { validateLabIsolation } from "./lab-isolation.js";
 /** Validate enabled capabilities without requiring any optional product. */
 import { configuredCollectorCredentials } from "../services/security-fusion-ingest.js";
 export function responseConfigured(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return Boolean(env["MAGNUS_RESPONSE_URL"] && env["MAGNUS_RESPONSE_SECRET"]);
+  return env["CINDERTRACE_LAB_ENABLED"] !== "true" && Boolean(env["MAGNUS_RESPONSE_URL"] && env["MAGNUS_RESPONSE_SECRET"]);
 }
 export function validateRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
+  validateLabIsolation(env);
   for (const name of [
     "DATABASE_URL",
     "REDIS_URL",

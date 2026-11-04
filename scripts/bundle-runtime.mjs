@@ -100,6 +100,7 @@ writeFileSync(
   join(runtime, "cindertrace-release.json"),
   JSON.stringify(manifest, null, 2) + "\n",
 );
+execFileSync(process.execPath, ["scripts/check-private.mjs", "--artifact", runtime], {cwd: root, env: buildEnv, stdio: "inherit"});
 const file = join(root, "artifacts", "cindertrace-" + revision + ".tar.gz");
 execFileSync("tar", [
   "--sort=name",

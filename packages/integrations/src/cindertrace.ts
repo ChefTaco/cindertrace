@@ -1,4 +1,6 @@
 import {
+  labRunSchema, labComparisonSchema, labTransitionSchema, labStatusSchema,
+  type LabTransition,
   securityFusionInvestigationDraftSchema,
   type SecurityFusionInvestigationDraft,
 } from "@cindertrace/contracts";
@@ -8,11 +10,13 @@ export class CindertraceClient {
   readonly #base: string;
   readonly #readToken: string;
   readonly #draftToken: string | undefined;
+  readonly #labControlToken: string | undefined;
   readonly #fetch: typeof fetch;
   constructor(options: {
     url: string;
     readToken: string;
     draftToken?: string;
+    labControlToken?: string;
     fetchImpl?: typeof fetch;
   }) {
     const url = new URL(options.url);
@@ -30,33 +34,29 @@ export class CindertraceClient {
     this.#base = url.href.replace(/\/$/, "") + "/api/v1/security-fusion";
     this.#readToken = options.readToken;
     this.#draftToken = options.draftToken;
+    this.#labControlToken = options.labControlToken;
     this.#fetch = options.fetchImpl ?? fetch;
   }
   async #request(
     path: string,
-    draft?: SecurityFusionInvestigationDraft,
+    body?: unknown,
+    scope: "draft" | "lab-control" = "draft",
   ): Promise<unknown> {
-    const token = draft ? this.#draftToken : this.#readToken;
+    const token = body === undefined ? this.#readToken : scope === "lab-control" ? this.#labControlToken : this.#draftToken;
     if (!token)
       throw new Error(
-        "A separate scoped investigation-draft credential is required",
+        scope === "lab-control" ? "A separate scoped lab-control credential is required" : "A separate scoped investigation-draft credential is required",
       );
     const response = await this.#fetch(this.#base + path, {
-      method: draft ? "POST" : "GET",
+      method: body === undefined ? "GET" : "POST",
       redirect: "error",
       signal: AbortSignal.timeout(15000),
       headers: {
         authorization: `Bearer ${token}`,
         accept: "application/json",
-        ...(draft ? { "content-type": "application/json" } : {}),
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
       },
-      ...(draft
-        ? {
-            body: JSON.stringify(
-              securityFusionInvestigationDraftSchema.parse(draft),
-            ),
-          }
-        : {}),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     if (!response.ok) {
       await response.body?.cancel();
@@ -79,6 +79,24 @@ export class CindertraceClient {
       await reader.cancel();
     }
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  }
+  async lab() {
+    const result = await this.#request("/lab") as {data: unknown};
+    return labStatusSchema.parse(result.data);
+  }
+  async labRun(id: string) {
+    const result = await this.#request("/lab/runs/" + encodeURIComponent(id)) as { data: unknown };
+    return labRunSchema.parse(result.data);
+  }
+  advanceLab(id: string, transition: LabTransition) {
+    return this.#request("/lab/runs/" + encodeURIComponent(id) + "/advance", labTransitionSchema.parse(transition), "lab-control");
+  }
+  completeLab(id: string, transition: LabTransition) {
+    return this.#request("/lab/runs/" + encodeURIComponent(id) + "/complete", labTransitionSchema.parse(transition), "lab-control");
+  }
+  async compareLab(id: string) {
+    const result = await this.#request("/lab/runs/" + encodeURIComponent(id) + "/comparison") as { data: unknown };
+    return labComparisonSchema.parse(result.data);
   }
   overview() {
     return this.#request("/overview");
@@ -103,7 +121,7 @@ export class CindertraceClient {
     if (!id || id.length > 160) throw new Error("Invalid case identity");
     return this.#request(
       "/cases/" + encodeURIComponent(id) + "/investigations",
-      draft,
+      securityFusionInvestigationDraftSchema.parse(draft),
     );
   }
 }

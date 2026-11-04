@@ -93,7 +93,7 @@ function rank(severity: string): number {
   return severityRank[severity] ?? 0;
 }
 
-function canonicalJson(value: unknown): string {
+export function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") {
     return `{${Object.entries(value as Record<string, unknown>)
@@ -809,18 +809,8 @@ export async function saveInvestigation(
   authorId: string,
   draft: SecurityFusionInvestigationDraft,
 ) {
-  const latest = await getDb().securityFusionInvestigation.findFirst({
-    where: { caseId },
-    orderBy: { revision: "desc" },
-  });
-  return getDb().securityFusionInvestigation.create({
-    data: {
-      caseId,
-      authorId,
-      revision: (latest?.revision ?? 0) + 1,
-      draftJson: JSON.stringify(draft),
-    },
-  });
+  const { saveLabAwareInvestigation } = await import("./investigation-lab.js");
+  return saveLabAwareInvestigation(caseId, authorId, draft);
 }
 
 export async function preserveEvidence(
@@ -1085,6 +1075,11 @@ async function deleteArchivedCase(
       where: { OR: [{ fromCaseId: caseId }, { toCaseId: caseId }] },
     });
     await tx.securityFusionCaseActivity.deleteMany({ where: { caseId } });
+    const labRuns = await tx.securityFusionLabRun.findMany({ where: { caseId }, select: { id: true } });
+    const runIds = labRuns.map(row => row.id);
+    await tx.securityFusionLabSimulation.deleteMany({ where: { runId: { in: runIds } } });
+    await tx.securityFusionLabCheckpoint.deleteMany({ where: { runId: { in: runIds } } });
+    await tx.securityFusionLabRun.deleteMany({ where: { caseId } });
     await tx.securityFusionInvestigation.deleteMany({ where: { caseId } });
     await tx.securityFusionCaseEntity.deleteMany({ where: { caseId } });
     await tx.securityFusionCaseEvent.deleteMany({ where: { caseId } });

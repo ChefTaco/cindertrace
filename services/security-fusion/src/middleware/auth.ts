@@ -35,17 +35,20 @@ export async function authMiddleware(c: Context<AppVariables>, next: Next) {
     token,
     process.env["SECURITY_PLUGIN_DRAFT_TOKEN_SHA256"],
   );
+  const labControl = tokenMatches(token, process.env["SECURITY_PLUGIN_LAB_CONTROL_TOKEN_SHA256"]);
   const workflow = tokenMatches(token, process.env["SECURITY_PLUGIN_WORKFLOW_TOKEN_SHA256"]);
   const sentiBridge = tokenMatches(token, process.env["SECURITY_EXTERNAL_APPROVAL_TOKEN_SHA256"] ?? process.env["SECURITY_SENTI_BRIDGE_TOKEN_SHA256"]);
-  if (read || draft || workflow || sentiBridge) {
+  if (read || draft || workflow || sentiBridge || labControl) {
     const path = c.req.path.replace("/api/v1/security-fusion", "");
-    const allowed = sentiBridge
+    const allowed = labControl
+      ? process.env["CINDERTRACE_LAB_ENABLED"] === "true" && c.req.method === "POST" && /^\/lab\/runs\/[^/]+\/(advance|complete)$/.test(path)
+      : sentiBridge
       ? (c.req.method === "GET" && (path === "/approval-plans" || /^\/approval-plans\/[^/]+$/.test(path)))
         || (c.req.method === "POST" && path === "/approval-decisions")
       : read
       ? (c.req.method === "POST" && /^\/cases\/[^/]+\/assurance\/exposure\/preview$/.test(path)) ||
         (c.req.method === "GET" &&
-        (path === "/sources" ||
+        (path === "/lab" || /^\/lab\/runs\/[^/]+(?:\/comparison)?$/.test(path) || path === "/sources" ||
           /^\/(overview|cases|events|entities|evidence)(\/[^/]+)?$/.test(path)))
       : draft ? c.req.method === "POST" &&
         /^\/cases\/[^/]+\/investigations$/.test(path)
@@ -63,7 +66,7 @@ export async function authMiddleware(c: Context<AppVariables>, next: Next) {
       );
     c.set("user", {
       userId: sentiBridge ? "service:senti-approval-bridge"
-        : `service:security-plugin:${read?.[0] ?? (draft ? "draft" : "aegis-workflow")}`,
+        : `service:security-plugin:${read?.[0] ?? (draft ? "draft" : labControl ? "lab-control" : "aegis-workflow")}`,
       email: "",
       role: "OPERATOR",
       iat: 0,

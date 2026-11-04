@@ -52,7 +52,7 @@ export default async function SecurityLayout({
           </div>
         </div>
         <div className="mx-auto mt-2 max-w-7xl px-4">
-          <FusionNav />
+          <FusionNav labEnabled={process.env["CINDERTRACE_LAB_ENABLED"] === "true"} />
         </div>
       </header>
       <div className="app-backdrop min-h-[calc(100vh-7rem)]">

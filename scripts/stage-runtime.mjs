@@ -1,3 +1,5 @@
+import { DEPENDENCY_PACKAGES as CONSOLE_EXTERNALS } from "../apps/security-console/scripts/stage.mjs";
+import { runtimeDependencyFile, bundleJoseRuntime } from "./runtime-dependencies.mjs";
 import {
   readFileSync,
   writeFileSync,
@@ -8,6 +10,8 @@ import {
   readdirSync,
   rmSync,
   symlinkSync,
+  lstatSync,
+  renameSync,
 } from "node:fs";
 import { resolve, join, dirname, relative, isAbsolute } from "node:path";
 const root = resolve(import.meta.dirname, "..");
@@ -47,12 +51,12 @@ function copy(source, target, dependency = false) {
   cpSync(source, target, {
     recursive: true,
     verbatimSymlinks: true,
-    filter: (path) =>
-      !path.endsWith(".map") &&
-      !path.endsWith(".tsbuildinfo") &&
-      (!dependency ||
-        path === source ||
-        !relative(source, path).split("/").includes("node_modules")),
+    filter: path => {
+      if (path.endsWith(".map") || path.endsWith(".tsbuildinfo")) return false;
+      if (!dependency || path === source) return true;
+      const part = relative(source, path).split("\\").join("/");
+      return !part.split("/").includes("node_modules") && runtimeDependencyFile(part);
+    },
   });
 }
 function visit(path) {
@@ -111,7 +115,11 @@ for (const workspace of workspaces) {
   );
   if (workspace !== "apps/security-console")
     copy(join(path, "dist"), join(destination, workspace, "dist"));
-  visit(path);
+  if (workspace === "apps/security-console") {
+    // Next's standalone trace already contains its production dependency closure.
+    // Only packages deliberately externalized by console staging belong here.
+    for (const name of CONSOLE_EXTERNALS) visit(resolvePackage(path, name).path);
+  } else visit(path);
 }
 copy(join(root, "apps/security-console/dist"), join(destination, "console"));
 copy(
@@ -127,6 +135,8 @@ for (const name of [
   "core-integration.mjs",
   "recovery-integration.mjs",
   "demo.mjs",
+  "lab.mjs",
+  "lab-integration.mjs",
   "upgrade.mjs",
   "upgrade-policy.mjs",
   "upgrade-artifacts.mjs",
@@ -135,6 +145,28 @@ for (const name of [
   "upgrade-native.mjs",
 ])
   copy(join(root, "scripts", name), join(destination, "scripts", name));
+for (const path of copied) {
+  if (readPackage(path).name === "jose")
+    await bundleJoseRuntime({ root, source: path, destination: join(destination, insideRoot(path)) });
+}
+
+// Materialize only in-tree package aliases, so the entire final payload is scanned.
+function materializeAliases(path) {
+  for (const entry of readdirSync(path, { withFileTypes: true })) {
+    const item = join(path, entry.name);
+    if (entry.isSymbolicLink()) {
+      const target = realpathSync(item), part = relative(destination, target);
+      if (!part || part.startsWith("..") || isAbsolute(part)) throw new Error("Runtime alias escapes payload");
+      const temporary = item + ".materialized";
+      cpSync(target, temporary, { recursive: true, dereference: true });
+      rmSync(item);
+      renameSync(temporary, item);
+    } else if (entry.isDirectory()) materializeAliases(item);
+    else if (!lstatSync(item).isFile()) throw new Error("Runtime payload contains a special file");
+  }
+}
+materializeAliases(destination);
+
 // Retain dependency licences and notices. Source maps and build metadata are not runtime inputs.
 function trim(path) {
   for (const entry of readdirSync(path, { withFileTypes: true })) {
@@ -142,7 +174,7 @@ function trim(path) {
     if (entry.isDirectory()) trim(item);
     else if (
       entry.isFile() &&
-      (entry.name.endsWith(".map") || entry.name.endsWith(".test.mjs"))
+      (!runtimeDependencyFile(entry.name) || entry.name.endsWith(".test.mjs"))
     )
       rmSync(item);
   }

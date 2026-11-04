@@ -33,3 +33,20 @@ describe("Security Fusion export table contract", () => {
     );
   });
 });
+
+it('keeps historical profiles fixed when additive lab tables enter the current schema', async () => {
+  const {securityTablesForProfile} = await import('./security-table-contract.mjs');
+  expect(securityTablesForProfile('cindertrace-v1')).toHaveLength(24);
+  expect(securityTablesForProfile('cindertrace-v1').some(name => name.includes('_lab_'))).toBe(false);
+  expect(securityTablesForProfile('embedded-magnus-v1').some(name => name.includes('_lab_'))).toBe(false);
+  expect(securityTablesForProfile('dedicated-v1').some(name => name.includes('_lab_'))).toBe(false);
+  expect(securityTablesForProfile('cindertrace-v2')).toEqual(SECURITY_FUSION_TABLES);
+});
+
+it('recognizes only the exact historical current archive table set', async () => {
+  const {securityTablesForProfile, securityTablesForArchive} = await import('./security-table-contract.mjs');
+  const old = securityTablesForProfile('cindertrace-v1');
+  expect(securityTablesForArchive('current', old)).toEqual(old);
+  expect(securityTablesForArchive('current', old.slice(1))).toEqual(SECURITY_FUSION_TABLES);
+  expect(securityTablesForArchive('cindertrace-v2', old)).toEqual(SECURITY_FUSION_TABLES);
+});

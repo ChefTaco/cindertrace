@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   CaseTable,
   FusionHeader,
@@ -30,6 +31,11 @@ export default async function SecurityFusionOverview(): Promise<React.ReactEleme
         title="Cindertrace"
         copy="Investigate security findings, connect related activity, and preserve evidence. Response requires explicit approval."
       />
+      {process.env["CINDERTRACE_LAB_ENABLED"] === "true" && <Link href="/security-fusion/lab" className="mb-6 block border-l-2 border-primary bg-surface p-5 text-sm text-text">
+        <span className="block text-xs uppercase tracking-widest text-primary">Disposable investigation lab</span>
+        <span className="mt-2 block">Follow evolving evidence. Revisit your hypotheses. Review how your confidence changed.</span>
+        <span className="mt-3 block text-primary">Start or resume investigation →</span>
+      </Link>}
       <section className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {["critical", "high", "medium", "low"].map((severity) => (
           <div key={severity} className="border border-border/60 p-4">

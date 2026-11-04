@@ -94,11 +94,11 @@ export function EvidenceBraid({ events }: { events: FusionEvent[] }): React.Reac
   if (!events.length) return <EmptyState>No event lanes are attached to this case.</EmptyState>;
   return (
     <div className="grid-bg relative overflow-hidden rounded-panel border border-border/60 bg-bg/50 p-4">
-      <div className="absolute bottom-0 left-1/2 top-0 w-px bg-gradient-to-b from-transparent via-accent/40 to-accent shadow-[0_0_8px_var(--color-accent)]" />
+      <div className="absolute bottom-0 left-6 top-0 sm:left-1/2 w-px bg-gradient-to-b from-transparent via-accent/40 to-accent shadow-[0_0_8px_var(--color-accent)]" />
       <div className="space-y-3">
         {events.map((event, index) => (
-          <div key={event.id} className={`relative grid grid-cols-[1fr_28px_1fr] items-center ${index % 2 ? '' : 'text-right'}`}>
-            <div className={cn('rounded-chip border border-border/50 bg-surface/80 px-3 py-2', index % 2 ? 'col-start-3' : 'col-start-1')}>
+          <div key={event.id} className={`relative grid grid-cols-[20px_minmax(0,1fr)] sm:grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] items-center ${index % 2 ? '' : 'sm:text-right'}`}>
+            <div className={cn('min-w-0 break-words rounded-chip border border-border/50 bg-surface/80 px-3 py-2 col-start-2', index % 2 ? 'sm:col-start-3' : 'sm:col-start-1')}>
               <p className="num text-[9px] uppercase tracking-wider text-text-muted">
                 {sourceLabel(event.source)} · {new Date(event.observedAt).toLocaleString()}
               </p>
@@ -107,7 +107,7 @@ export function EvidenceBraid({ events }: { events: FusionEvent[] }): React.Reac
                 {Math.round((event.confidenceContribution ?? event.confidence) * 100)}% confidence contribution
               </p>
             </div>
-            <span className="relative col-start-2 row-start-1 mx-auto flex h-3 w-3 items-center justify-center">
+            <span className="relative col-start-1 sm:col-start-2 row-start-1 mx-auto flex h-3 w-3 items-center justify-center">
               <span className={cn('absolute inset-0 rounded-full opacity-40 animate-halo', laneColor[event.source] ?? 'bg-primary')} />
               <span className={cn('relative h-2.5 w-2.5 rounded-full shadow-[0_0_9px_currentColor]', laneColor[event.source] ?? 'bg-primary text-primary')} />
             </span>

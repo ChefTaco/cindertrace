@@ -31,12 +31,16 @@
     "upgrade": "node scripts/upgrade.mjs",
     "release:bundle": "node scripts/bundle-runtime.mjs",
     "test:upgrade": "CINDERTRACE_UPGRADE_TEST_CONFIRM=disposable-installation node scripts/upgrade-integration.mjs",
-    "tools:check": "node scripts/check-tool-identifiers.mjs"
+    "tools:check": "node scripts/check-tool-identifiers.mjs",
+    "lab": "node scripts/lab.mjs",
+    "test:lab": "node scripts/lab-integration.mjs",
+    "test:lab:browser": "node scripts/lab-browser.mjs"
   },
   "devDependencies": {
     "typescript": "6.0.3",
     "vitest": "4.1.12",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "esbuild": "0.28.2"
   },
   "overrides": {
     "@hono/node-server": "2.1.5",

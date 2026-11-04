@@ -101,5 +101,9 @@ or overwriting anything; use it to reconcile an interrupted recovery attempt.
 
 Routine code upgrades use the [dedicated upgrade command](UPGRADING.md), which
 freezes services and independently verifies recovery before migration. Retain
-versioned schema profiles: `cindertrace-v1` identifies the first standalone release,
-while `dedicated-v1` and `embedded-magnus-v1` cover the earlier extraction sources.
+versioned schema profiles: `cindertrace-v2` adds lab runs, checkpoints and simulated
+decisions; `cindertrace-v1` identifies the first standalone release, while `dedicated-v1` and `embedded-magnus-v1` cover the earlier extraction sources.
+
+New exports pin a named schema profile. Older archives labeled `current` remain
+readable only when their exact table set matches a reviewed historical profile.
+Lab state participates in current recovery and case retention.

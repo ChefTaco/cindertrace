@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  labTransitionSchema, labDecisionSchema,
   securityFusionEventBatchSchema,
   securityFusionSourceReportSchema,
   securityFusionInvestigationDraftSchema,
@@ -16,7 +17,10 @@ export function buildOpenApiSpec() {
       "/api/v1/security-fusion" + route.path.replace(/:([a-zA-Z]+)/g, "{$1}");
     const method = route.method.toLowerCase();
     const schema =
-      route.path === "/ingest/events"
+      /^\/lab\/runs\/:id\/(advance|complete)$/.test(route.path) ? labTransitionSchema
+        : method === 'post' && (route.path === '/lab/runs' || route.path.endsWith('/restart')) ? z.object({}).strict()
+        : route.path.endsWith('/decision') && route.path.startsWith('/lab/') ? labDecisionSchema
+        : route.path === "/ingest/events"
         ? securityFusionEventBatchSchema
         : route.path === "/ingest/source-status"
           ? securityFusionSourceReportSchema

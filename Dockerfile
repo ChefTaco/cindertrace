@@ -10,7 +10,7 @@ COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/integrations/package.json packages/integrations/package.json
 RUN npm ci
 COPY . .
-RUN npm run build && npm run stage -w @cindertrace/console && node scripts/stage-runtime.mjs
+RUN npm run build && npm run stage -w @cindertrace/console && node scripts/stage-runtime.mjs && node scripts/check-private.mjs --artifact artifacts/runtime
 FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates postgresql-client openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=postgres-tools /usr/lib/postgresql/18/bin/pg_dump /usr/local/bin/pg_dump

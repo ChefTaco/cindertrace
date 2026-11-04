@@ -1,3 +1,4 @@
+import { decodeRouteSegment } from "@/lib/route-segment";
 import { readBoundedBody, PayloadTooLargeError } from "@/lib/request-body";
 import { NextRequest, NextResponse } from "next/server";
 import { securityRequest } from "@/lib/security-api";
@@ -16,7 +17,9 @@ async function handler(
       req.headers.get("origin") !== process.env["DASHBOARD_PUBLIC_ORIGIN"]
     )
       return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
-    const parts = (await params).path;
+    let parts: string[];
+    try { parts = (await params).path.map(decodeRouteSegment); }
+    catch { return NextResponse.json({ error: "Invalid path" }, { status: 400 }); }
     if (
       parts.some(
         (p) =>

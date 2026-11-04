@@ -93,3 +93,30 @@ does not install a fleet agent, alter host firewalls, or provision external sour
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and bundled font notices.
+
+## Evolving investigation lab
+
+In a **fresh separate checkout**, initialize a disposable installation:
+
+```sh
+npm ci
+npm run init -- --lab
+npm run lab -- up
+```
+
+Open `https://localhost:3445` and sign in using that checkout's
+`state/initial-credentials.txt`. Choose **Lab**, then **Start investigation**.
+Save an assessment before each evidence release. Completion compares structured
+claims and containment choices against evidence available at each revision.
+Confidence and freeform reasoning remain investigator judgments, not model grades.
+
+The lab generates a dedicated Compose project, database, volumes, TLS certificate,
+state, and independent agent credentials. It refuses existing configuration and
+forbids external ingestion, integrations, notifications, and dispatch. Containment
+is a human-approved simulation and never changes a host or account.
+
+`npm run lab -- stop` preserves history; `npm run lab -- up` resumes it. To remove
+only the lab containers and database volumes, run `npm run lab -- destroy NAME`,
+where NAME is the exact `COMPOSE_PROJECT_NAME` in that lab's configuration. Local
+state and credentials remain in its separate checkout until you remove it.
+See [lab workflow and agent API](docs/INVESTIGATION-LAB.md).

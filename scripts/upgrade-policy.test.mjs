@@ -124,3 +124,9 @@ test("upgrade children cannot inherit loader or executable-path injection", () =
     "postgresql://fixture:fixture@localhost/example",
   );
 });
+
+test('lab schema release requires reviewed schema reconciliation before automatic rollback', () => {
+  const release = JSON.parse(readFileSync(new URL('../release.json', import.meta.url), 'utf8'));
+  assert.equal(release.schemaProfile, 'cindertrace-v2');
+  assert.equal(release.rollbackCompatible, false);
+});

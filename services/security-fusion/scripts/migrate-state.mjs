@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { createHash } from "node:crypto";
-import { securityTablesForProfile } from "./security-table-contract.mjs";
+import { securityTablesForProfile, securityTablesForArchive } from "./security-table-contract.mjs";
 const require = createRequire(resolve("package.json"));
 require("dotenv").config({ quiet: true });
 const { Client } = require("pg");
@@ -78,7 +78,7 @@ try {
     await db.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
     const data = {
       version: 1,
-      profile: sourceProfile,
+      profile: sourceProfile === "current" ? "cindertrace-v2" : sourceProfile,
       createdAt: new Date().toISOString(),
       evidenceBase,
       tables: {},
@@ -166,8 +166,8 @@ try {
       data = JSON.parse(
         gunzipSync(bytes, { maxOutputLength: 1024 * 1024 * 1024 }),
       );
-    const archiveTables = securityTablesForProfile(
-      data.profile ?? process.env.CINDERTRACE_ARCHIVE_PROFILE ?? "dedicated-v1",
+    const archiveTables = securityTablesForArchive(
+      data.profile ?? process.env.CINDERTRACE_ARCHIVE_PROFILE ?? "dedicated-v1", Object.keys(data.tables).sort(),
     );
     if (
       data.version !== 1 ||

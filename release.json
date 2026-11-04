@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "product": "cindertrace",
   "layoutVersion": 1,
-  "rollbackCompatible": true,
-  "notes": "This release preserves the existing database schema and application layout. Future migrations require a reviewed rollback-compatibility decision.",
-  "schemaProfile": "cindertrace-v1"
+  "rollbackCompatible": false,
+  "notes": "Adds lab run, checkpoint and simulation tables. Rollback requires a reviewed compatible schema and verified restore; no down migration is applied.",
+  "schemaProfile": "cindertrace-v2"
 }

@@ -76,6 +76,33 @@ if (
   }).status === 0
 )
   throw new Error("Nonempty restore destination was accepted");
+// A pre-lab native schema remains independently restorable with the new tools.
+const nativeV1Name = name.replace("restore_", "native_v1_");
+const nativeV1RestoredName = name.replace("restore_", "native_v1_restored_");
+const nativeV1Admin = new Client({ connectionString: sourceUrl });
+await nativeV1Admin.connect();
+try {
+  await nativeV1Admin.query(`CREATE DATABASE "${nativeV1Name}" TEMPLATE "${name}"`);
+  await nativeV1Admin.query(`CREATE DATABASE "${nativeV1RestoredName}"`);
+} finally { await nativeV1Admin.end(); }
+const nativeV1Url = sourceUrl.replace(/\/[^/]+$/, "/" + nativeV1Name);
+const nativeV1Db = new Client({ connectionString: nativeV1Url });
+await nativeV1Db.connect();
+try { await nativeV1Db.query('DROP TABLE security_fusion_lab_checkpoints, security_fusion_lab_runs, security_fusion_lab_simulations'); }
+finally { await nativeV1Db.end(); }
+const nativeV1File = state + "/native-v1.aes";
+execFileSync(process.execPath, ["scripts/backup.mjs", "backup", nativeV1File], {
+  cwd: root, stdio: "pipe", env: { ...env, DATABASE_URL: nativeV1Url, CINDERTRACE_SOURCE_PROFILE: "cindertrace-v1" },
+});
+const nativeV1State = state + "/native-v1-restored";
+mkdirSync(nativeV1State, { mode: 0o700 });
+const nativeV1Env = { ...env, DATABASE_URL: sourceUrl.replace(/\/[^/]+$/, "/" + nativeV1RestoredName),
+  CINDERTRACE_STATE_DIR: nativeV1State, SECURITY_FUSION_EVIDENCE_DIR: nativeV1State + "/evidence",
+  SECURITY_FUSION_RECEIPT_CHAIN_EXPORT: nativeV1State + "/receipts.jsonl", AUDIT_LOG_DIR: nativeV1State + "/audit",
+};
+execFileSync(process.execPath, ["scripts/backup.mjs", "restore", nativeV1File], { cwd: root, env: nativeV1Env, stdio: "pipe" });
+const nativeV1Integrity = JSON.parse(execFileSync(process.execPath, ["scripts/verify-restored-state.mjs"], { cwd: api, env: nativeV1Env, encoding: "utf8" }));
+if (nativeV1Integrity.labRunsVerified !== 0) throw new Error("Historical schema unexpectedly acquired lab state");
 // Exercise the public Magnus schema profile, including additive column defaults.
 // Retain every database and archive so a failed rehearsal can be investigated.
 const legacyName = name.replace("restore_", "legacy_");
@@ -92,7 +119,7 @@ const legacyUrl = sourceUrl.replace(/\/[^/]+$/, "/" + legacyName);
 const legacy = new Client({ connectionString: legacyUrl });
 await legacy.connect();
 try {
-  await legacy.query(`DROP TABLE security_fusion_approval_decisions,
+  await legacy.query(`DROP TABLE security_fusion_lab_checkpoints, security_fusion_lab_runs, security_fusion_lab_simulations, security_fusion_approval_decisions,
     security_fusion_assurance_packets, security_fusion_telegram_decisions`);
   await legacy.query(
     `ALTER TABLE security_fusion_actions DROP COLUMN "verificationDeadline"`,
@@ -218,6 +245,7 @@ console.log(
     tamperingRejected: true,
     nonemptyDestinationRejected: true,
     encryptedBackupVerified: true,
+    historicalNativeRestoreVerified: true,
     independentRestoreVerified: true,
     embeddedImportVerified: true,
     orphanedEffectsBlockTransfer: true,
