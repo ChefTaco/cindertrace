@@ -294,8 +294,12 @@ try {
       ledger: process.env.SECURITY_FUSION_RECEIPT_CHAIN_EXPORT,
       checkpoint: process.env.CINDERTRACE_COLLECTOR_BOUNDARY_FILE,
       environment: process.env.CINDERTRACE_BACKUP_ENV_FILE,
+      installation: process.env.CINDERTRACE_BACKUP_INSTALLATION_FILE,
     }))
       if (path) await add(role, path, role + ".private");
+    const uiAudit = process.env.UI_SECURITY_LOG_PATH;
+    if (uiAudit && existsSync(uiAudit))
+      await add("ui-audit", uiAudit, "ui-audit.private");
     writeFileSync(join(temporary, "manifest.json"), JSON.stringify(manifest), {
       mode: 0o600,
     });

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "backend": "native",
+  "runtimeRoot": "/opt/cindertrace/current",
+  "releaseRoot": "/opt/cindertrace/releases",
+  "recordRoot": "/var/lib/cindertrace-upgrades",
+  "api": {
+    "root": "/opt/cindertrace-api",
+    "env": "/opt/cindertrace-api/.env",
+    "unit": "cindertrace-api.service",
+    "user": "cindertrace"
+  },
+  "console": {
+    "root": "/opt/cindertrace-console",
+    "env": "/opt/cindertrace-console/.env",
+    "unit": "cindertrace-console.service",
+    "user": "cindertrace"
+  },
+  "collector": {
+    "root": "/opt/cindertrace-collector",
+    "env": "/opt/cindertrace-collector/.env",
+    "unit": "cindertrace-collector.service",
+    "user": "cindertrace"
+  },
+  "maintenanceTimers": ["cindertrace-backup.timer", "cindertrace-tls.timer"],
+  "maintenanceServices": [
+    "cindertrace-backup.service",
+    "cindertrace-tls.service"
+  ],
+  "apiHealth": "https://security.example.com:4101/ready",
+  "consoleHealth": "https://security.example.com:3444/api/health",
+  "caFile": "/etc/cindertrace/tls/ca.pem"
+}

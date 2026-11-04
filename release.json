@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "product": "cindertrace",
+  "layoutVersion": 1,
+  "rollbackCompatible": true,
+  "notes": "This release preserves the existing database schema and application layout. Future migrations require a reviewed rollback-compatibility decision.",
+  "schemaProfile": "cindertrace-v1"
+}

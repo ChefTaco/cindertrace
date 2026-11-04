@@ -37,6 +37,15 @@ Never commit `.env`, certificates, state, incident data, or captures of live cas
 See [installation](docs/INSTALLATION.md), [integrations](docs/INTEGRATIONS.md),
 [recovery and migration](docs/MIGRATION.md), and [publication](docs/PUBLISHING.md).
 
+For subsequent Compose releases, select a reviewed commit and run:
+
+```sh
+npm run upgrade -- --to COMMIT --project-dir /opt/cindertrace
+```
+
+The [upgrade runbook](docs/UPGRADING.md) covers native systemd installations,
+dry runs, verified recovery backups, interrupted upgrades, and current-state rollback.
+
 ## Synthetic demo
 
 For a synthetic demo, use a separate checkout and newly generated configuration

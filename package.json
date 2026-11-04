@@ -22,12 +22,16 @@
     "init": "node scripts/init.mjs",
     "check:private": "node scripts/check-private.mjs",
     "scan:secrets": "node scripts/check-private.mjs --secrets",
-    "verify": "npm run build && npm run typecheck && npm test && npm run openapi:check && npm run check:private",
+    "verify": "npm run build && npm run typecheck && npm run tools:check && npm test && npm run openapi:check && npm run check:private",
     "openapi:check": "node scripts/check-openapi.mjs",
     "hooks:install": "git config core.hooksPath .githooks",
     "test:core": "node scripts/core-integration.mjs",
     "test:recovery": "node scripts/recovery-integration.mjs",
-    "demo": "node scripts/demo.mjs"
+    "demo": "node scripts/demo.mjs",
+    "upgrade": "node scripts/upgrade.mjs",
+    "release:bundle": "node scripts/bundle-runtime.mjs",
+    "test:upgrade": "CINDERTRACE_UPGRADE_TEST_CONFIRM=disposable-installation node scripts/upgrade-integration.mjs",
+    "tools:check": "node scripts/check-tool-identifiers.mjs"
   },
   "devDependencies": {
     "typescript": "6.0.3",

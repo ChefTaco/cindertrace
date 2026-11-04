@@ -23,6 +23,7 @@ test("runtime staging preserves nested versions and traced shims while excluding
     file(path + "/package.json", JSON.stringify(value));
   try {
     pkg(".", { name: "fixture-root", version: "0.1.0", type: "module" });
+    file("release.json", JSON.stringify({ product: "cindertrace", layoutVersion: 1, schemaProfile: "cindertrace-v1" }));
     for (const name of [
       "apps/security-console",
       "services/security-fusion",
@@ -68,6 +69,12 @@ test("runtime staging preserves nested versions and traced shims while excluding
       "core-integration.mjs",
       "recovery-integration.mjs",
       "demo.mjs",
+      "upgrade.mjs",
+      "upgrade-policy.mjs",
+      "upgrade-artifacts.mjs",
+      "upgrade-probe.mjs",
+      "upgrade-compose.mjs",
+      "upgrade-native.mjs",
     ])
       file("scripts/" + name, "// fixture");
     cpSync(

@@ -1,6 +1,6 @@
 /** Shared release policy. Findings contain locations and rule names, never matching values. */
 export function forbiddenPath(path) {
-  return /(^|\/)\.env($|\.(?!example$))|(^|\/)\.npmrc$|\.(pem|key|crt|p12|pfx|db|sqlite|sqlite3|bundle)(?:-(?:wal|shm|journal))?$|(^|\/)[^/]+\.local\.md$|(^|\/)\.private-terms$|(^|\/)\.vscode\/mcp\.json$|(^|\/)(certs|backups|state|artifacts|\.magnus|\.hive-dev|\.ssh|audit-logs|terminal-audit)\//i.test(
+  return /(^|\/)\.env($|\.(?!example$))|(^|\/)\.npmrc$|\.(pem|key|crt|p12|pfx|db|sqlite|sqlite3|bundle)(?:-(?:wal|shm|journal))?$|(^|\/)[^/]+\.local\.md$|(^|\/)\.private-terms$|(^|\/)\.vscode\/mcp\.json$|(^|\/)(certs|backups|state|artifacts|\.cindertrace|\.magnus|\.hive-dev|\.ssh|audit-logs|terminal-audit)\//i.test(
     path,
   );
 }

@@ -1,7 +1,7 @@
 name: cindertrace
 x-app: &app
   build: .
-  image: cindertrace:local
+  image: '${CINDERTRACE_IMAGE:-cindertrace:local}'
   user: '${CINDERTRACE_UID:-1000}:${CINDERTRACE_GID:-1000}'
   env_file: .env
   restart: unless-stopped

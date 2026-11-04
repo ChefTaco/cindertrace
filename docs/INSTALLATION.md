@@ -20,3 +20,7 @@ Back up state and PostgreSQL together.
 
 Optional integration configuration is documented in INTEGRATIONS.md. Keep all
 secrets out of browser variables, command arguments, logs, and Git.
+
+Use the dedicated [upgrade command and recovery runbook](UPGRADING.md) for subsequent
+releases. It supports the Compose stack and an explicitly configured native
+systemd layout, with frozen backup/restore verification before migration.

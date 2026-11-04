@@ -46,6 +46,7 @@ jobs:
           docker compose exec -T api node -e
           'process.env.CINDERTRACE_TEST_DATABASE_URL=process.env.DATABASE_URL.replace(/\/[^/]+$/,"/cindertrace_test_core_ci");import("./scripts/core-integration.mjs")'
       - run: docker compose exec -T -e CINDERTRACE_RECOVERY_TEST_CONFIRM=disposable-installation api node scripts/recovery-integration.mjs
+      - run: npm run test:upgrade
       - name: Stop disposable installation
         if: always()
         run: docker compose down

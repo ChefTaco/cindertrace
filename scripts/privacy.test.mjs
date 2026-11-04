@@ -18,6 +18,7 @@ test("recognizes real-looking secrets and private endpoints without returning va
   for (const path of [
     ".env",
     "state/evidence.json",
+    ".cindertrace/upgrades/record.json",
     "secret.key",
     "audit-logs/2026.jsonl",
   ])

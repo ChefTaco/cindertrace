@@ -121,6 +121,12 @@ for (const name of [
   "core-integration.mjs",
   "recovery-integration.mjs",
   "demo.mjs",
+  "upgrade.mjs",
+  "upgrade-policy.mjs",
+  "upgrade-artifacts.mjs",
+  "upgrade-probe.mjs",
+  "upgrade-compose.mjs",
+  "upgrade-native.mjs",
 ])
   copy(join(root, "scripts", name), join(destination, "scripts", name));
 // Retain dependency licences and notices. Source maps and build metadata are not runtime inputs.
@@ -154,3 +160,16 @@ writeFileSync(
   ) + "\n",
 );
 console.log(JSON.stringify({ runtimePackages: copied.size }));
+
+// Public release metadata contains no installation configuration.
+writeFileSync(
+  join(destination, "cindertrace-release.json"),
+  JSON.stringify(
+    {
+      ...JSON.parse(readFileSync(join(root, "release.json"), "utf8")),
+      version: readPackage(root).version,
+    },
+    null,
+    2,
+  ) + "\n",
+);
