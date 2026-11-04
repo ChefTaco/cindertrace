@@ -8,6 +8,7 @@ import type {
   SecurityPermission,
 } from "../types/index.js";
 import { HttpError } from "./error-handler.js";
+import { oathweaveAuthentication } from './oathweave.js';
 export function safeEqual(a: string, b: string): boolean {
   const aa = Buffer.from(a),
     bb = Buffer.from(b);
@@ -73,6 +74,10 @@ export async function authMiddleware(c: Context<AppVariables>, next: Next) {
       exp: 0,
     });
   } else {
+    let identity: AuthTokenPayload | undefined;
+    try { identity = await oathweaveAuthentication(token); }
+    catch { throw new HttpError(401, 'UNAUTHORIZED', 'Invalid or unlinked identity session'); }
+    if (identity) { c.set('user',identity); await next(); return; }
     try {
       const secret = process.env["SECURITY_CONSOLE_TOKEN_SECRET"];
       if (!secret || secret.length < 32) throw new Error("missing secret");
