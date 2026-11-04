@@ -19,8 +19,9 @@ git rev-parse 'v0.1.0^{commit}'
 Pass the resulting 40-character commit as `--to`. The command does not select
 `latest`, reset your checkout, replace secrets, or regenerate installation keys.
 Obtain the current upgrade tooling in a separate trusted checkout if the installed
-source predates the upgrade command. Node 24.22.1+ or 26.13.0+ is required. Build and review
-release payloads before publishing them, following PUBLISHING.md.
+source predates the upgrade command. Supported Node versions are 24.22.1 or later
+on the 24.x line, or 26.13.0 or later on the 26.x line. Build and review release
+payloads before publishing them, following the [publication gate](PUBLISHING.md).
 
 ## Compose
 
@@ -63,8 +64,12 @@ The API and console must use one application service account. The collector is
 optional; when present, it must use that same account. Other service layouts need
 a separately reviewed installation migration before using this command.
 
-Build the runtime archive on Linux with the installation's architecture and a
-supported Node version, in a clean checkout without installation `.env` files:
+Reviewed native archives, SHA-256 sidecars, and publication reviews are attached
+to [GitHub Releases](https://github.com/ChefTaco/cindertrace/releases). Select the
+archive for your installation's architecture and verify its digest against the
+release review. If building your own archive, build on Linux with the
+installation's architecture and a supported Node version, in a clean checkout
+without installation `.env` files:
 
 ```sh
 npm run release:bundle

@@ -14,3 +14,9 @@ A sanitized working copy must not conceal private staged content.
 Record the exact candidate tree and artifact SHA-256 digests and the review result.
 Keep private source provenance and operational evidence outside Git. Re-run the
 gate after changes. Publish only the verified candidate. Never bypass hooks.
+
+Documentation-only commits can advance `main` after an application release.
+Verify the deployed manifest revision and archive digest against the published
+application release; documentation changes alone do not require a runtime
+replacement. Changes to executable code, configuration, dependencies, or schema
+require new verified application artifacts and the normal upgrade gates.

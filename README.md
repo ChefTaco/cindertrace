@@ -35,7 +35,9 @@ docker compose --profile collector up -d collector
 
 Never commit `.env`, certificates, state, incident data, or captures of live cases.
 See [installation](docs/INSTALLATION.md), [integrations](docs/INTEGRATIONS.md),
-[recovery and migration](docs/MIGRATION.md), and [publication](docs/PUBLISHING.md).
+[recovery and migration](docs/MIGRATION.md), [privacy](PRIVACY.md), and
+[publication](docs/PUBLISHING.md). Reviewed runtime archives, checksums, and the
+publication review are available from [GitHub Releases](https://github.com/ChefTaco/cindertrace/releases).
 
 For subsequent Compose releases, select a reviewed commit and run:
 

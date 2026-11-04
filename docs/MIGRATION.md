@@ -54,10 +54,21 @@ CINDERTRACE_RESTORE_CONFIRM=empty-isolated-destination node scripts/backup.mjs r
 independently. Backups use AES-256-GCM and refuse overwrite. The backup includes
 the security state archive and configured audit files and receipt ledger.
 `CINDERTRACE_COLLECTOR_BOUNDARY_FILE` includes the collector boundary;
-`CINDERTRACE_BACKUP_ENV_FILE` includes recovery configuration. A restored
-environment is written to a private file for explicit review, never automatically
-installed over current credentials. Copy encrypted backups to independently
-administered storage and test restoration regularly.
+`CINDERTRACE_BACKUP_ENV_FILE` includes a recovery environment, and
+`CINDERTRACE_BACKUP_INSTALLATION_FILE` includes an operator-prepared private file
+containing the complete installation configuration. `UI_SECURITY_LOG_PATH` includes
+the configured UI audit file when it exists. The managed upgrade command prepares
+the complete service environments and TLS material automatically. A manually
+configured backup must explicitly include console/collector configuration and
+required signing material; the API environment alone may not contain all of them.
+
+Restored environments, installation material, and UI audit copies are written to
+private files under the isolated recovery state directory. Review them explicitly;
+the tool does not install them over live credentials or the current UI audit file.
+Copy encrypted backups to independently administered storage and test restoration
+regularly. Configured HTTPS receivers may require the generated
+`security-YYYYMMDDTHHMMSSZ.aes` name; omit the filename for an automatic backup name
+instead of using the illustrative `security.aes` above.
 
 ## Rollback and stabilization
 
@@ -87,3 +98,8 @@ every original field and applies new column defaults. Keep the encrypted source
 migration history as recovery evidence. Prefer native backups for large datasets.
 `verify-restored` checks an already restored database and assets without importing
 or overwriting anything; use it to reconcile an interrupted recovery attempt.
+
+Routine code upgrades use the [dedicated upgrade command](UPGRADING.md), which
+freezes services and independently verifies recovery before migration. Retain
+versioned schema profiles: `cindertrace-v1` identifies the first standalone release,
+while `dedicated-v1` and `embedded-magnus-v1` cover the earlier extraction sources.
