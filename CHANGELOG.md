@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.1 - 2026-11-05
+
+### Security
+
+- Remove npm, npx, corepack and yarn from the runtime image, and purge apt and libapt-pkg6.0 (dpkg and its package database stay). The API, console, collector, migration CLI (`node scripts/apply-migrations.mjs`, also with `--verify-current`) and password-hash CLI run on node alone. This removes the image's fixable HIGH findings: npm's bundled brace-expansion 5.0.9 (CVE-2026-102276, CVE-2026-102278) and undici 6.28.0 (CVE-2026-19534, CVE-2026-87018, CVE-2026-109383, CVE-2026-109869), and apt 2.6.1 (CVE-2026-109518).
+- Compose's `migrate` service keeps its `npm run db:migrate` command, which managed upgrades require to stay unchanged. `/usr/local/bin/npm` in the image is a small script that runs only that migration with node and rejects every other npm command.
+- The PostgreSQL 18.6 client tools copied into the image (pg_dump, pg_restore, psql and libpq) have no HIGH or CRITICAL findings. gosu is not copied.
+- Trivy 0.70.0 reports no fixable HIGH or CRITICAL findings in the image. These Debian 12 findings have no fix available yet and remain: zlib1g CVE-2023-45853 (CRITICAL) and CVE-2026-76844, libldap-2.5-0 CVE-2023-2953, ncurses CVE-2025-69720, libsystemd0/libudev1 CVE-2026-16742, gzip CVE-2026-41992, util-linux CVE-2026-53613, CVE-2026-53615 and CVE-2026-78410, libacl1 CVE-2026-54369, and perl CVE-2026-9538.
+
 ## 0.2.0 - 2026-11-05
 
 - Publish `ghcr.io/cheftaco/cindertrace` from version tags as a multi-architecture image built on
