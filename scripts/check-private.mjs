@@ -14,6 +14,7 @@ const git = (...argv) =>
   execFileSync("git", argv, { cwd: root, maxBuffer: 128 * 1024 * 1024 });
 const skip = new Set([
   ".git",
+  ".cindertrace",
   ".playwright-cli",
   "generated",
   "node_modules",
