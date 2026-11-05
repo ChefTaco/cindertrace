@@ -35,7 +35,8 @@
     "lab": "node scripts/lab.mjs",
     "test:lab": "node scripts/lab-integration.mjs",
     "test:lab:browser": "node scripts/lab-browser.mjs",
-    "test:browser-auth": "node scripts/browser-auth-integration.mjs"
+    "test:browser-auth": "node scripts/browser-auth-integration.mjs",
+    "test:response": "node scripts/response-integration.mjs"
   },
   "devDependencies": {
     "typescript": "6.0.3",

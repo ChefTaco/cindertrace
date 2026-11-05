@@ -76,3 +76,18 @@ Configure `SECURITY_APPROVAL_PUBLIC_KEY_B64`, `SECURITY_APPROVAL_ACTOR_SHA256`,
 and the bridge bearer digest `SECURITY_EXTERNAL_APPROVAL_TOKEN_SHA256`.
 Legacy v2/v3 signatures and historical decisions remain compatible. All new
 executable approvals still require a current pending plan and ten-minute expiry.
+
+The bounded response drill uses the built API, an empty disposable PostgreSQL
+schema, Redis and a locally generated certificate authority. Run `npm run build`
+first, then set `CINDERTRACE_TEST_DATABASE_URL` to a dedicated database named
+`cindertrace_test_response_*`, `CINDERTRACE_TEST_REDIS_URL` to disposable Redis,
+and `CINDERTRACE_RESPONSE_TEST_CONFIRM=isolated-synthetic-installation` before
+`npm run test:response`. The drill applies packaged migrations and retains its
+synthetic database rows for inspection; it never selects operational accounts,
+contacts Magnus or executes a host command. Its HTTPS responder verifies the
+request signature and returns a request-bound signed receipt. Assertions cover
+expired approvals before decision and dispatch, changed previews, concurrent
+one-use decisions, exactly one command, lost replies and invalid receipts becoming
+unknown, and expired durable claims never being sent again. This proves the API
+and dispatcher boundary, while real Magnus admission and host execution retain
+their separate acceptance gates.
