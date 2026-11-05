@@ -1,5 +1,9 @@
 # Changelog
 
+- Publish `ghcr.io/cheftaco/cindertrace` from version tags as a multi-architecture image built on
+  native amd64 and arm64 runners, gated on CI, with provenance attestation and refusal to overwrite
+  an existing version. Make the Dockerfile's PostgreSQL client library copy work on arm64.
+
 - Add `RELAX_AUTH_LIMITS` for testing. Sign-in throttles rise to 10000 attempts per window with no retry delay, at runtime only. The API prints a warning at startup and `GET /health` reports `authLimitsRelaxed`. Behaviour without the setting is unchanged.
 
 - Support an optional same-origin post-OAuth console landing path, rejecting unsafe

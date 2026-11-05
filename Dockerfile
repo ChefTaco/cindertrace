@@ -16,7 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 COPY --from=postgres-tools /usr/lib/postgresql/18/bin/pg_dump /usr/local/bin/pg_dump
 COPY --from=postgres-tools /usr/lib/postgresql/18/bin/pg_restore /usr/local/bin/pg_restore
 COPY --from=postgres-tools /usr/lib/postgresql/18/bin/psql /usr/local/bin/psql
-COPY --from=postgres-tools /usr/lib/x86_64-linux-gnu/libpq.so.5.18 /usr/lib/x86_64-linux-gnu/libpq.so.5
+COPY --from=postgres-tools /usr/lib/*-linux-gnu/libpq.so.5.18 /tmp/libpq/
+# Debian's library directory is named after the machine architecture.
+RUN mv /tmp/libpq/libpq.so.5.18 "/usr/lib/$(uname -m)-linux-gnu/libpq.so.5" && rmdir /tmp/libpq
 WORKDIR /app
 COPY --from=build /build/artifacts/runtime ./
 ENV NODE_ENV=production

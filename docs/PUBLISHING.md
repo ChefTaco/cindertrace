@@ -30,3 +30,12 @@ entrypoints are excluded. Executable strings and privacy rules are not rewritten
 In-tree package aliases are materialized so the scanner reads the whole payload
 directly. Container builds, native archive packaging and CI all run the unchanged
 artifact scanner against the final runtime, including every shipped dependency.
+
+## Container image
+
+`.github/workflows/release-image.yml` runs on a `v*` tag. It runs the full CI workflow, builds on
+native amd64 and arm64 runners, and publishes `ghcr.io/cheftaco/cindertrace:X.Y.Z` as one
+multi-architecture image with a build provenance attestation. It refuses a version that already
+exists and never publishes `latest`. Each image build runs the artifact scanner against the final
+runtime. The GitHub release it creates records the source commit, the source tree and the image
+digest. GHCR creates a new package as private, so make the package public after the first push.
