@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.2.0 - 2026-11-05
+
 - Publish `ghcr.io/cheftaco/cindertrace` from version tags as a multi-architecture image built on
   native amd64 and arm64 runners, gated on CI, with provenance attestation and refusal to overwrite
   an existing version. Make the Dockerfile's PostgreSQL client library copy work on arm64.
@@ -17,8 +19,6 @@
 - Export immutable browser-safe request/response contracts, document consumed
   responses in OpenAPI, and verify real API wire records without changing
   authorization, approval or storage behavior.
-
-## Unreleased
 
 - Add an isolated PostgreSQL/API and signed HTTPS dispatcher drill for exact-plan
   expiry, concurrent one-use approval, lost replies, invalid receipts and expired
