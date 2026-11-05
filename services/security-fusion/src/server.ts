@@ -1,6 +1,7 @@
 import {isRehearsal,securityWritesEnabled} from "./config/rehearsal.js";
 import { readFile } from "node:fs/promises";
 import { rateLimitMiddleware } from "./middleware/rate-limit.js";
+import { authLimitsRelaxed } from "./config/auth-limits.js";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { securityFusionRouter } from "./routes/security-fusion.js";
@@ -23,7 +24,11 @@ app.use("*", async (c, next) => {
 app.route('/api/v1/auth/local', browserAuthRouter());
 app.route('/api/v1/auth/oathweave', oathweaveBrowserRouter());
 app.get("/health", (c) =>
-  c.json({ success: true, service: "cindertrace-api" }),
+  c.json({
+    success: true,
+    service: "cindertrace-api",
+    authLimitsRelaxed: authLimitsRelaxed(),
+  }),
 );
 app.get("/ready", async (c) => {
   await getDb().$queryRaw`SELECT 1`;

@@ -10,6 +10,13 @@ are never a fallback. `DASHBOARD_ADMIN_ACCOUNT_ID` preserves the reviewed local
 account identity. `AUTH_RATE_LIMIT_LABEL_KEY` is optional and defaults to the
 session secret; both require at least 32 characters.
 
+`RELAX_AUTH_LIMITS=true` is for testing only. The API and console sign-in throttles
+stay enabled with a ceiling of 10000 attempts per window and no retry delay, and the
+Oathweave session exchange limit rises to the same ceiling. Credential checks and
+audit events are unchanged, and nothing is written to stored state, so removing the
+setting restores normal limits on the next start. The API prints a warning at startup
+and its public `GET /health` response reports the mode in `authLimitsRelaxed`.
+
 | API | Behavior |
 | --- | --- |
 | `POST /api/v1/auth/local/login` | Exact Origin, bounded JSON credentials, durable source/account/pair throttling, Argon2id verification, audited session creation |

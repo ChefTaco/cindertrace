@@ -6,6 +6,9 @@ import { resolveListenerSecurity } from "./config/listener-security.js";
 config({ quiet: true });
 const { validateRuntimeConfig } = await import("./config/runtime.js");
 validateRuntimeConfig();
+const { authLimitsRelaxed, relaxedAuthLimitsWarning } =
+  await import("./config/auth-limits.js");
+if (authLimitsRelaxed()) console.warn(relaxedAuthLimitsWarning());
 for (const key of [
   "DATABASE_URL",
   "SECURITY_CONSOLE_TOKEN_SECRET",

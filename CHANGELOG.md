@@ -1,5 +1,7 @@
 # Changelog
 
+- Add `RELAX_AUTH_LIMITS` for testing. Sign-in throttles rise to 10000 attempts per window with no retry delay, at runtime only. The API prints a warning at startup and `GET /health` reports `authLimitsRelaxed`. Behaviour without the setting is unchanged.
+
 - Support an optional same-origin post-OAuth console landing path, rejecting unsafe
   redirect configuration before authorization code exchange.
 

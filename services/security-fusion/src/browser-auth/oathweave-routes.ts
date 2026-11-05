@@ -1,5 +1,6 @@
 import {Hono} from 'hono';
 import {rateLimitMiddleware} from '../middleware/rate-limit.js';
+import {authLimitsRelaxed,RELAXED_AUTH_ATTEMPT_CEILING} from '../config/auth-limits.js';
 import {setCookie} from 'hono/cookie';
 import type {AppVariables} from '../types/index.js';
 import {browserAuthEnabled,browserSessions,COOKIE_NAME,type BrowserSessions} from './sessions.js';
@@ -8,7 +9,7 @@ import {logAuditEvent} from '../services/audit-service.js';
 /** Product-owned exchange: no password, account enrollment or console-minted administrator token. */
 export function oathweaveBrowserRouter(dependencies:{env?:NodeJS.ProcessEnv;sessions?:()=>Promise<BrowserSessions>;audit?:typeof logAuditEvent}={}) {
  const env=dependencies.env??process.env,router=new Hono<AppVariables>();
- router.use('*',rateLimitMiddleware({max:30,windowMs:60000,keyPrefix:'oathweave-browser-exchange',failClosed:true}));
+ router.use('*',rateLimitMiddleware({max:authLimitsRelaxed(env)?RELAXED_AUTH_ATTEMPT_CEILING:30,windowMs:60000,keyPrefix:'oathweave-browser-exchange',failClosed:true}));
  router.post('/session',async c=>{
   if(!browserAuthEnabled(env))return c.json({error:'Browser authentication is not configured'},404);
   if(!exactBrowserOrigin(c.req.header('Origin'),env))return c.json({error:'Exact browser origin required'},403);

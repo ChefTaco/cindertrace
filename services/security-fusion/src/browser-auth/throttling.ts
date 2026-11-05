@@ -9,6 +9,28 @@ const PAIR_LIMIT = 5;
 const MAX_CONCURRENT_AUTH = 8;
 const MAX_DELAY_MS = 4_000;
 
+// RELAX_AUTH_LIMITS is a runtime-only testing mode: the same keys and admission
+// flow run with a very high ceiling and no retry delay.
+const RELAXED_ATTEMPT_LIMIT = 10_000;
+const RELAXED_CONCURRENT_AUTH = 256;
+function admissionLimits() {
+  return process.env["RELAX_AUTH_LIMITS"] === "true"
+    ? {
+        source: RELAXED_ATTEMPT_LIMIT,
+        username: RELAXED_ATTEMPT_LIMIT,
+        pair: RELAXED_ATTEMPT_LIMIT,
+        concurrent: RELAXED_CONCURRENT_AUTH,
+        maxDelayMs: 0,
+      }
+    : {
+        source: SOURCE_LIMIT,
+        username: USERNAME_LIMIT,
+        pair: PAIR_LIMIT,
+        concurrent: MAX_CONCURRENT_AUTH,
+        maxDelayMs: MAX_DELAY_MS,
+      };
+}
+
 const ATTEMPT_SCRIPT = `
 local counts = {}
 for i, key in ipairs(KEYS) do
@@ -90,6 +112,7 @@ export function createAuthProtection(
     const sourceKey = `${prefix}dashboard-auth:source:${sourceLabel}`;
     const usernameKey = `${prefix}dashboard-auth:username:${usernameLabel}`;
     const pairKey = `${prefix}dashboard-auth:pair:${pairLabel}`;
+    const limits = admissionLimits();
     let acquired = false;
 
     try {
@@ -98,7 +121,7 @@ export function createAuthProtection(
           ACQUIRE_SCRIPT,
           1,
           concurrencyKey,
-          MAX_CONCURRENT_AUTH,
+          limits.concurrent,
           30_000,
         ),
       );
@@ -126,12 +149,14 @@ export function createAuthProtection(
         number,
       ];
       const delayMs =
-        pairCount <= 1 ? 0 : Math.min(MAX_DELAY_MS, 250 * 2 ** (pairCount - 2));
+        pairCount <= 1
+          ? 0
+          : Math.min(limits.maxDelayMs, 250 * 2 ** (pairCount - 2));
       if (delayMs > 0) await sleep(delayMs);
       const allowed =
-        sourceCount <= SOURCE_LIMIT &&
-        usernameCount <= USERNAME_LIMIT &&
-        pairCount <= PAIR_LIMIT;
+        sourceCount <= limits.source &&
+        usernameCount <= limits.username &&
+        pairCount <= limits.pair;
       return permit(allowed, allowed ? 0 : Math.ceil(WINDOW_MS / 1000));
     } catch (error) {
       if (acquired)

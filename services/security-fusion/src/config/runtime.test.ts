@@ -44,3 +44,13 @@ it("rejects secret reuse across browser, audit, and execution purposes", () => {
     }),
   ).toThrow(/distinct/);
 });
+it("accepts only exact relaxed authentication limit values", () => {
+  for (const value of [undefined, "", "true", "false"])
+    expect(() =>
+      validateRuntimeConfig({ ...core, RELAX_AUTH_LIMITS: value }),
+    ).not.toThrow();
+  for (const value of ["yes", "1", "TRUE"])
+    expect(() =>
+      validateRuntimeConfig({ ...core, RELAX_AUTH_LIMITS: value }),
+    ).toThrow("RELAX_AUTH_LIMITS");
+});
