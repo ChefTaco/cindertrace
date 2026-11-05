@@ -21,6 +21,14 @@ COPY --from=postgres-tools /usr/lib/*-linux-gnu/libpq.so.5.18 /tmp/libpq/
 RUN mv /tmp/libpq/libpq.so.5.18 "/usr/lib/$(uname -m)-linux-gnu/libpq.so.5" && rmdir /tmp/libpq
 WORKDIR /app
 COPY --from=build /build/artifacts/runtime ./
+# The runtime runs only node. Remove the base image's package managers (npm and
+# corepack bundle vulnerable dependencies) and apt; dpkg's database stays so
+# scanners still see the installed OS packages. Compose's migrate service keeps
+# its `npm run db:migrate` command through a node-only compatibility script.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+ && dpkg --purge --force-remove-protected --force-remove-essential apt libapt-pkg6.0 \
+ && rm -rf /etc/apt /var/lib/apt /var/cache/apt /var/log/apt
+COPY --chmod=0755 scripts/npm-compat.sh /usr/local/bin/npm
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 USER node
