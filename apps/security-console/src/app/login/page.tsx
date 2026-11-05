@@ -117,7 +117,7 @@ export default function LoginPage(): React.ReactElement {
             href="/api/auth/hive/start"
             className="mb-4 block rounded border border-primary p-3 text-center text-primary"
           >
-            Sign in with Hive
+            Sign in with Oathweave
           </a>
         )}
         {step === "credentials" ? (

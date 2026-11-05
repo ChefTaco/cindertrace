@@ -15,9 +15,13 @@ export async function securityRequest(path: string, init: RequestInit = {}) {
     (await cookies()).get(COOKIE_NAME)?.value ?? "",
   );
   if (!session) throw new Error("Authentication required");
-  if (session.provider === "hive")
-    await hiveCredential(session, (process.env["CINDERTRACE_API_URL"] ?? process.env["CONTROL_API_URL"])!);
-  if(useApiLocalAuth()&&session.provider!=="hive"){
+  if (session.provider === "hive") {
+    const origin=new URL((process.env["CINDERTRACE_API_URL"]??process.env["CONTROL_API_URL"])!);
+    if(origin.protocol!=="https:"||origin.username||origin.password||origin.search||origin.hash||origin.pathname!=="/")throw Error("Verified API origin required");
+    const credential=await hiveCredential(session,origin.origin);if(!credential)throw Error("Identity credential missing");
+    return fetch(`${origin.origin}/api/v1/${path}`,{...init,headers:{"Content-Type":"application/json",Authorization:`Bearer ${credential}`},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(20000)});
+  }
+  if(useApiLocalAuth()){
     const origin=new URL((process.env["CINDERTRACE_API_URL"]??process.env["CONTROL_API_URL"])!);
     if(origin.protocol!=="https:"||origin.username||origin.password||origin.pathname!=="/"||origin.search||origin.hash)throw Error("Verified API origin required");
     return fetch(`${origin.origin}/api/v1/${path}`,{...init,headers:{"Content-Type":"application/json",Cookie:`${COOKIE_NAME}=${(await cookies()).get(COOKIE_NAME)!.value}`,Origin:process.env["DASHBOARD_PUBLIC_ORIGIN"]!},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(20000)});

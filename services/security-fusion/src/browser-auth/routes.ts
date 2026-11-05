@@ -168,7 +168,7 @@ export function browserAuthRouter(
         userId:
           session.userId ?? env.DASHBOARD_ADMIN_ACCOUNT_ID ?? session.username,
         role: session.role,
-        provider: "local",
+        provider: session.provider === "oathweave" ? "oathweave" : "local",
       });
     } catch {
       return c.json({ error: "Session verification unavailable" }, 503);
@@ -177,7 +177,7 @@ export function browserAuthRouter(
   router.post("/logout", async (c) => {
     try {
       const service = await sessions(),
-        session = await service.verify(getCookie(c, COOKIE_NAME) ?? "");
+        session = await service.verify(getCookie(c, COOKIE_NAME) ?? "", false);
       if (session) {
         await service.revoke(session, c.req.query("all") === "true");
         await audit(

@@ -10,6 +10,7 @@ import { tokenMatches } from "./middleware/auth.js";
 import { getDb } from "./db/index.js";
 import { renderMetrics } from "./routes/metrics.js";
 import type { AppVariables } from "./types/index.js";
+import { oathweaveBrowserRouter } from './browser-auth/oathweave-routes.js';
 import { browserAuthRouter } from './browser-auth/routes.js';
 export const app = new Hono<AppVariables>();
 app.onError(errorHandler);
@@ -20,6 +21,7 @@ app.use("*", async (c, next) => {
   c.header("X-Content-Type-Options", "nosniff");
 });
 app.route('/api/v1/auth/local', browserAuthRouter());
+app.route('/api/v1/auth/oathweave', oathweaveBrowserRouter());
 app.get("/health", (c) =>
   c.json({ success: true, service: "cindertrace-api" }),
 );

@@ -14,7 +14,7 @@ export async function GET() {
     return response;
   } catch {
     return NextResponse.json(
-      { error: "Hive login unavailable" },
+      { error: "Oathweave sign-in unavailable" },
       { status: 503 },
     );
   }

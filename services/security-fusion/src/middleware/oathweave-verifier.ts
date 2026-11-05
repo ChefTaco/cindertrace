@@ -21,6 +21,7 @@ export interface OathweaveIdentity {
   permissions: string[];
   displayName: string;
   authenticatedAt?: number;
+  expiresAt?: number;
 }
 
 /** Resource JWT validation plus online session revocation. Failure is closed. */
@@ -92,6 +93,7 @@ export function createOathweaveVerifier(
       subject: payload.sub,
       issuer: options.issuer,
       sessionId: payload.sessionId,
+      expiresAt: payload.exp,
       permissions: payload.permissions as string[],
       roles: payload.roles as string[],
       displayName,

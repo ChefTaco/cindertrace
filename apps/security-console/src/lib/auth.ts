@@ -21,7 +21,7 @@ export interface SessionPayload {
   email?: string;
   userId?: string;
   role?: "ADMIN" | "OPERATOR" | "VIEWER";
-  provider?: "hive";
+  provider?: "hive" | "oathweave";
   sessionId?: string;
   iat: number;
   exp: number;
@@ -75,7 +75,7 @@ export async function createSessionToken(
     email?: string;
     userId?: string;
     role?: "ADMIN" | "OPERATOR" | "VIEWER";
-    provider?: "hive";
+    provider?: "hive" | "oathweave";
     sessionId?: string;
   },
 ): Promise<string> {

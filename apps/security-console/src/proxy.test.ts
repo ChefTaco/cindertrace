@@ -1,0 +1,11 @@
+import{afterEach,expect,it,vi}from'vitest';import{NextRequest}from'next/server';
+const state=vi.hoisted(()=>({valid:true}));
+vi.mock('jose',()=>({jwtVerify:async()=>({payload:{provider:'oathweave',userId:'retained-product-admin',username:'Named operator',role:'ADMIN'}})}));
+vi.mock('@/lib/auth-constants',()=>({COOKIE_NAME:'cindertrace_session',getSecretKey:()=>new Uint8Array(32),sessionVerificationOptions:()=>({})}));
+vi.mock('@/lib/api-local-auth',()=>({useApiLocalAuth:()=>true,verifyApiLocalSession:async()=>state.valid?{role:'ADMIN'}:null}));
+vi.mock('@/lib/hive-login',()=>({hiveCredential:vi.fn()}));vi.mock('@/lib/local-sessions',()=>({verifyLocalSession:vi.fn()}));
+import proxy from './proxy';
+afterEach(()=>{state.valid=true});
+const request=(path:string)=>new NextRequest('https://console.example.com'+path,{headers:{cookie:'cindertrace_session=obviously.fake.session'}});
+it('keeps shared identity behind owning API authorization and denies legacy local host administration',async()=>{expect((await proxy(request('/api/admin/ssh'))).status).toBe(403);expect((await proxy(request('/api/proxy/security-fusion/cases'))).status).toBe(200);expect((await proxy(request('/api/auth/me'))).status).toBe(200)});
+it('rejects a captured cookie immediately when API-owned identity verification fails',async()=>{state.valid=false;expect((await proxy(request('/api/proxy/security-fusion/cases'))).status).toBe(401)});

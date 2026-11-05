@@ -72,6 +72,8 @@ export default async function proxy(req: NextRequest): Promise<NextResponse> {
         payload as unknown as SessionPayload,
         (process.env["CINDERTRACE_API_URL"] ?? process.env["CONTROL_API_URL"])!,
       );
+    }
+    if (payload["provider"] === "hive" || payload["provider"] === "oathweave") {
       // Local SSH, host administration and embedded admin gateways use a
       // separate authority. Named sessions delegate only through the API.
       if (

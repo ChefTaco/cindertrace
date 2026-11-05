@@ -10,5 +10,5 @@ export const localBrowserProfileSchema = z.object({
   username: z.string(),
   userId: z.string(),
   role: z.enum(["ADMIN", "OPERATOR", "VIEWER"]),
-  provider: z.literal("local"),
+  provider: z.enum(["local", "oathweave"]),
 });
