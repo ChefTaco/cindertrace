@@ -14,3 +14,5 @@ it.each(['SECURITY_INGEST_ENABLED', 'SECURITY_DISPATCH_ENABLED', 'SECURITY_NOTIF
 it.each(['OATHWEAVE_ISSUER', 'CINDERTRACE_OATHWEAVE_IDENTITIES_JSON', 'HIVE_OAUTH_CLIENT_ID', 'MAGNUS_RESPONSE_URL', 'MAGNUS_INVENTORY_TOKEN', 'LOKI_URL', 'CHATTERMOST_SECURITY_EXPORT_TOKEN', 'SECURITY_FUSION_INGEST_SECRET', 'UI_SECURITY_SOURCES_JSON', 'SECURITY_EXTERNAL_APPROVAL_TOKEN_SHA256'])('rejects external setting %s', key => {
   expect(() => validateLabIsolation({...env, [key]: 'fixture'})).toThrow(key);
 });
+
+it("permits the explicit read-only rehearsal guard while retaining all external integration fences",()=>{expect(()=>validateLabIsolation({...env,HIVE_REHEARSAL:"true"})).not.toThrow();expect(()=>validateLabIsolation({...env,HIVE_REHEARSAL:"yes"})).toThrow();});

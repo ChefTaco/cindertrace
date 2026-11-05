@@ -1,3 +1,4 @@
+import {isRehearsal} from "../config/rehearsal.js";
 import { randomUUID } from "node:crypto";
 import { magnusRequest, type ResponseRequest } from "@cindertrace/integrations";
 import { responseConfigured } from "../config/runtime.js";
@@ -9,7 +10,7 @@ import { validateStoredContainmentPlan } from "./senti-containment-approval.js";
 let busy = false;
 export async function dispatchSecurityFusionOutbox(): Promise<number> {
   if (
-    busy ||
+    isRehearsal() || busy ||
     process.env["SECURITY_WRITES_ENABLED"] !== "true" ||
     process.env["SECURITY_DISPATCH_ENABLED"] !== "true" ||
     !responseConfigured()
@@ -370,6 +371,7 @@ export async function reconcileRestartVerification(): Promise<void> {
 }
 let timer: ReturnType<typeof setInterval> | undefined;
 export function startSecurityFusionOutboxDispatcher(): void {
+  if(isRehearsal()||timer)return;
   timer = setInterval(() => {
     void dispatchSecurityFusionOutbox().catch(() =>
       incMetric("dispatcherErrors"),
@@ -379,4 +381,5 @@ export function startSecurityFusionOutboxDispatcher(): void {
 }
 export function stopSecurityFusionOutboxDispatcher(): void {
   if (timer) clearInterval(timer);
+  timer=undefined;
 }

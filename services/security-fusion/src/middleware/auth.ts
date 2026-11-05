@@ -9,6 +9,9 @@ import type {
 } from "../types/index.js";
 import { HttpError } from "./error-handler.js";
 import { oathweaveAuthentication } from './oathweave.js';
+import { getCookie } from 'hono/cookie';
+import { browserAuthEnabled, browserSessions, COOKIE_NAME } from '../browser-auth/sessions.js';
+import { exactBrowserOrigin } from '../browser-auth/origin.js';
 export function safeEqual(a: string, b: string): boolean {
   const aa = Buffer.from(a),
     bb = Buffer.from(b);
@@ -26,6 +29,16 @@ export function tokenMatches(
 }
 export async function authMiddleware(c: Context<AppVariables>, next: Next) {
   const token = c.req.header("Authorization")?.replace(/^Bearer /, "") ?? "";
+  if (!token && browserAuthEnabled() && getCookie(c, COOKIE_NAME)) {
+    if (!['GET', 'HEAD'].includes(c.req.method) && !exactBrowserOrigin(c.req.header('Origin')))
+      throw new HttpError(403, 'FORBIDDEN', 'Exact browser origin required');
+    let session;
+    try {session=await (await browserSessions()).verify(getCookie(c, COOKIE_NAME)!);}
+    catch {throw new HttpError(503,'AUTH_UNAVAILABLE','Browser session verification is unavailable');}
+    if(!session)throw new HttpError(401,'UNAUTHORIZED','Invalid or revoked browser session');
+    c.set('user',{userId:session.userId??process.env.DASHBOARD_ADMIN_ACCOUNT_ID??session.username,email:'',role:session.role,iat:session.iat,exp:session.exp});
+    await next(); return;
+  }
   const registry = JSON.parse(
     process.env["SECURITY_PLUGIN_READ_DIGESTS_JSON"] ?? "{}",
   ) as Record<string, string>;

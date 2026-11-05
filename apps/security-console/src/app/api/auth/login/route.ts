@@ -1,3 +1,4 @@
+import {useApiLocalAuth,apiLocalRequest,forwardedSessionCookie} from "@/lib/api-local-auth";
 import { readBoundedBody, PayloadTooLargeError } from "@/lib/request-body";
 import {recordSecurityEvent} from '@/lib/security-events';
 /**
@@ -24,6 +25,19 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request): Promise<NextResponse> {
   if (req.headers.get("origin") !== process.env["DASHBOARD_PUBLIC_ORIGIN"]) return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  if(useApiLocalAuth()){
+    try {
+      const raw=await readBoundedBody(req,4096);let candidate:unknown;try{candidate=JSON.parse(raw);}catch{return NextResponse.json({error:"Invalid request"},{status:400});}
+      if(!candidate||typeof candidate!=="object"||Array.isArray(candidate))return NextResponse.json({error:"Invalid request"},{status:400});
+      const body=candidate as Record<string,unknown>;
+      const response=await apiLocalRequest("login",{body:JSON.stringify({username:body.username??body.email,password:body.password})});
+      const payload=await response.text();if(Buffer.byteLength(payload)>16384)throw Error("Invalid authentication response");
+      const result=new NextResponse(payload,{status:response.status,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
+      const cookie=forwardedSessionCookie(response);if(cookie)result.headers.set("Set-Cookie",cookie);
+      const retry=response.headers.get("Retry-After");if(retry)result.headers.set("Retry-After",retry);
+      return result;
+    }catch(error){return NextResponse.json({error:error instanceof PayloadTooLargeError?"Request too large":"Authentication temporarily unavailable"},{status:error instanceof PayloadTooLargeError?413:503});}
+  }
   let permit: Awaited<ReturnType<typeof beginAuthentication>> | undefined;
   let auditUsername = '';
   let stage = 'input';

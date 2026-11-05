@@ -9,7 +9,7 @@ export function runtimeDependencyFile(path) {
   return true;
 }
 
-export const JOSE_RUNTIME_EXPORTS = Object.freeze(['SignJWT', 'jwtVerify', 'createRemoteJWKSet']);
+export const JOSE_RUNTIME_EXPORTS = Object.freeze(['SignJWT', 'jwtVerify', 'createRemoteJWKSet', 'customFetch', 'decodeProtectedHeader']);
 
 /** Bundle the production entrypoints; unused key import/export APIs are not shipped. */
 export async function bundleJoseRuntime({ root, source, destination }) {

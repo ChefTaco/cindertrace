@@ -12,7 +12,7 @@ Collectors, listeners, Hive login/export, Magnus inventory/response, and other
 external sources require explicit configuration. Browser requests use the console's
 same-origin proxy; integration credentials remain on the server.
 
-Console authentication audit records use keyed account/source labels and retain
+Native API and console authentication audit records use keyed account/source labels and retain
 the source IP address. Labels are pseudonyms, not anonymization. The console does
 not log submitted passwords, session cookies, authorization headers, or OAuth
 codes. Other observations can still contain identities supplied by their source.
@@ -52,3 +52,7 @@ Never publish live incidents, credentials, environments, logs, databases, backup
 private infrastructure details, or screenshots of real cases. Use synthetic data
 for reports and examples. Follow the [publication gate](docs/PUBLISHING.md) and
 report vulnerabilities through the [private security channel](SECURITY.md).
+
+Native API sign-in retains compatible collector event files and its integrity-protected
+audit chain. Preserve these private files and independent installations separately;
+see [API-owned browser authentication](docs/BROWSER_AUTH.md).

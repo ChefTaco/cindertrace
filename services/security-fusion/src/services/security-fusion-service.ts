@@ -1,3 +1,4 @@
+import {isRehearsal,securityWritesEnabled} from "../config/rehearsal.js";
 import {
   failureWindow,
   uiSource,
@@ -209,7 +210,7 @@ async function notifyChatterMost(
   revisionKey: string,
   message: string,
 ): Promise<void> {
-  if (process.env["SECURITY_NOTIFICATIONS_ENABLED"] !== "true") return;
+  if (isRehearsal() || process.env["SECURITY_NOTIFICATIONS_ENABLED"] !== "true") return;
   const baseUrl = process.env["SECURITY_FUSION_CHATTERMOST_URL"]?.replace(
     /\/$/u,
     "",
@@ -1178,6 +1179,7 @@ export async function purgeSecurityFusion(now = new Date()): Promise<{
   deletedCases: number;
   receipts: number;
 }> {
+  if(isRehearsal())return {events:0,evidence:0,truncatedEvidence:0,archivedCases:0,deletedCases:0,receipts:0};
   const eventCutoff = new Date(
     now.getTime() -
       SECURITY_FUSION_RETENTION_POLICY.eventDays * 24 * 60 * 60_000,
@@ -1279,12 +1281,12 @@ export async function purgeSecurityFusion(now = new Date()): Promise<{
 let retentionTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startSecurityFusionRetention(): void {
-  if (retentionTimer || process.env['SECURITY_WRITES_ENABLED'] !== 'true') return;
+  if (retentionTimer || !securityWritesEnabled()) return;
   void purgeSecurityFusion().catch((error: unknown) =>
     console.error("[security-fusion] retention failed", error),
   );
   retentionTimer = setInterval(() => {
-    if (process.env['SECURITY_WRITES_ENABLED'] !== 'true') return;
+    if (!securityWritesEnabled()) return;
     void purgeSecurityFusion().catch((error: unknown) =>
       console.error("[security-fusion] retention failed", error),
     );

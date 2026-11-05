@@ -1,3 +1,4 @@
+import {useApiLocalAuth,apiLocalRequest,forwardedSessionCookie} from "@/lib/api-local-auth";
 import { revokeLocalSession } from "@/lib/local-sessions";
 import { recordSecurityEvent } from "@/lib/security-events";
 /**
@@ -24,6 +25,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { error: "Session revocation unavailable; retry sign out" },
       { status: 503 },
     );
+  }
+  if(useApiLocalAuth()&&session?.provider!=="hive"){
+    try{
+      const upstream=await apiLocalRequest("logout",{...(token?{token}:{}),all:request.nextUrl.searchParams.get("all")==="true"});
+      if(!upstream.ok)return NextResponse.json({error:"Session revocation unavailable; retry sign out"},{status:upstream.status});
+      const response=request.headers.get("accept")?.includes("text/html")?NextResponse.redirect(new URL("/login",process.env["DASHBOARD_PUBLIC_ORIGIN"]!),303):NextResponse.json({ok:true});
+      const cookie=forwardedSessionCookie(upstream);if(cookie)response.headers.set("Set-Cookie",cookie);response.headers.set("Cache-Control","no-store");return response;
+    }catch{return NextResponse.json({error:"Session revocation unavailable; retry sign out"},{status:503});}
   }
   if (session)
     await recordSecurityEvent(

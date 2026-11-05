@@ -1,3 +1,4 @@
+import {useApiLocalAuth,verifyApiLocalSession} from "@/lib/api-local-auth";
 import { verifyLocalSession } from "@/lib/local-sessions";
 import { hiveCredential } from "@/lib/hive-login";
 import type { SessionPayload } from "@/lib/auth";
@@ -63,7 +64,8 @@ export default async function proxy(req: NextRequest): Promise<NextResponse> {
       getSecretKey(),
       sessionVerificationOptions(),
     );
-    if (!(await verifyLocalSession(payload as unknown as SessionPayload)))
+    const valid=useApiLocalAuth()&&payload["provider"]!=="hive"?Boolean(await verifyApiLocalSession(token)):await verifyLocalSession(payload as unknown as SessionPayload);
+    if (!valid)
       return unauthenticatedResponse(req, true);
     if (payload["provider"] === "hive") {
       await hiveCredential(

@@ -46,6 +46,12 @@ test('bundled JWT/JWKS runtime preserves signature and claim checks with no priv
     const jwks = runtime.createRemoteJWKSet(url);
     const external = await new runtime.SignJWT({}).setProtectedHeader({alg: 'EdDSA', kid: jwk.kid}).setIssuer('fixture-idp').setAudience('fixture-api').setExpirationTime('60s').sign(keys.privateKey);
     assert.equal((await runtime.jwtVerify(external, jwks, {issuer: 'fixture-idp', audience: 'fixture-api', algorithms: ['EdDSA']})).payload.iss, 'fixture-idp');
+    assert.equal(runtime.decodeProtectedHeader(external).kid,jwk.kid);
+    let verifiedFetches=0;
+    const verifiedKeys=runtime.createRemoteJWKSet(new URL('https://identity.example.com/jwks'),{[runtime.customFetch]:async()=>{verifiedFetches++;return Response.json({keys:[jwk]});}});
+    assert.equal((await runtime.jwtVerify(external,verifiedKeys,{issuer:'fixture-idp',audience:'fixture-api',algorithms:['EdDSA']})).payload.iss,'fixture-idp');
+    assert.equal(verifiedFetches,1,'The packaged resource verifier retains its verified transport hook');
+
     const unknown = await new runtime.SignJWT({}).setProtectedHeader({alg: 'EdDSA', kid: 'unknown-fixture-key'}).sign(keys.privateKey);
     await assert.rejects(runtime.jwtVerify(unknown, jwks));
     healthy = false;

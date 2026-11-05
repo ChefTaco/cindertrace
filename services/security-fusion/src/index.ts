@@ -1,3 +1,4 @@
+import {isRehearsal,securityWritesEnabled} from "./config/rehearsal.js";
 import { config } from "dotenv";
 import { readFileSync, existsSync } from "node:fs";
 import { createServer } from "node:https";
@@ -28,13 +29,13 @@ const {
   stopSecurityFusionOutboxDispatcher,
 } = await import("./services/security-fusion-outbox.js");
 await getDb().$queryRaw`SELECT 1`;
-if (process.env["SECURITY_WRITES_ENABLED"] === "true")
+if (securityWritesEnabled())
   await getDb().securityFusionReceiptChainHead.upsert({
     where: { id: "security-fusion" },
     create: { id: "security-fusion", chainSequence: 0 },
     update: {},
   });
-if (process.env["SECURITY_WRITES_ENABLED"] === "true")
+if (securityWritesEnabled())
   await reconcileSecurityFusionEvidence();
 const listener = resolveListenerSecurity({
   nodeEnv: process.env["NODE_ENV"] ?? "production",
@@ -60,24 +61,24 @@ const server = serve({
 });
 if (
   process.env["SECURITY_RETENTION_ENABLED"] === "true" &&
-  process.env["SECURITY_WRITES_ENABLED"] === "true"
+  securityWritesEnabled()
 )
   startSecurityFusionRetention();
-startSecurityFusionOutboxDispatcher();
+if(!isRehearsal()) startSecurityFusionOutboxDispatcher();
 const sync = () => {
-  if (process.env["SECURITY_WRITES_ENABLED"] !== "true") return;
+  if (!securityWritesEnabled()) return;
   void syncTargets().catch(() =>
     console.error("Security inventory synchronization failed"),
   );
 };
 sync();
-const timer = setInterval(sync, 60000);
+const timer = isRehearsal()?undefined:setInterval(sync, 60000);
 let stopping = false;
 for (const signal of ["SIGTERM", "SIGINT"])
   process.on(signal, () => {
     if (stopping) return;
     stopping = true;
-    clearInterval(timer);
+    if(timer)clearInterval(timer);
     stopSecurityFusionRetention();
     stopSecurityFusionOutboxDispatcher();
     server.close(() => {

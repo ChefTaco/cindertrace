@@ -16,9 +16,11 @@
   },
   "dependencies": {
     "@cindertrace/contracts": "0.1.0",
+    "@cindertrace/integrations": "0.1.0",
     "@hono/node-server": "2.1.5",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "argon2": "0.45.1",
     "dotenv": "18.0.9",
     "hono": "4.13.16",
     "ioredis": "6.0.0",
@@ -26,8 +28,7 @@
     "ky": "2.2.0",
     "nanoid": "6.0.2",
     "pg": "8.23.1",
-    "zod": "4.6.7",
-    "@cindertrace/integrations": "0.1.0"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

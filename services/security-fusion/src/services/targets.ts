@@ -1,3 +1,4 @@
+import {isRehearsal} from "../config/rehearsal.js";
 import { magnusRequest } from "@cindertrace/integrations";
 import { responseConfigured } from "../config/runtime.js";
 import { securityInventoryExportSchema } from "@cindertrace/contracts";
@@ -6,6 +7,7 @@ import { getDb } from "../db/index.js";
 import { HttpError } from "../middleware/error-handler.js";
 import { setMetricGauge } from "../routes/metrics.js";
 export async function syncTargets(): Promise<void> {
+  if(isRehearsal())return;
   const url = process.env["MAGNUS_INVENTORY_URL"];
   if (!url) return;
   const r = await fetch(url, {

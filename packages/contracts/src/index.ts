@@ -146,3 +146,5 @@ export type SecurityInventoryExport = z.infer<
 export function canonicalSecuritySource(source: string): string {
   return source === "aegis_ui" || source === "cindertrace_ui" ? "security_console" : source === "chattermost" ? "mattermost" : source;
 }
+
+export * from "./browser-auth.js";

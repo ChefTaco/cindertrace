@@ -34,7 +34,8 @@
     "tools:check": "node scripts/check-tool-identifiers.mjs",
     "lab": "node scripts/lab.mjs",
     "test:lab": "node scripts/lab-integration.mjs",
-    "test:lab:browser": "node scripts/lab-browser.mjs"
+    "test:lab:browser": "node scripts/lab-browser.mjs",
+    "test:browser-auth": "node scripts/browser-auth-integration.mjs"
   },
   "devDependencies": {
     "typescript": "6.0.3",

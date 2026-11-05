@@ -1,3 +1,4 @@
+import {useApiLocalAuth,verifyApiLocalSession} from "./api-local-auth";
 import { createLocalSession, verifyLocalSession } from "./local-sessions";
 /**
  * Server-side authentication for the Cindertrace security console.
@@ -108,6 +109,9 @@ export async function verifySessionToken(
     return null;
   }
   try {
+    if(useApiLocalAuth()&&session.provider!=="hive"){
+      const profile=await verifyApiLocalSession(token);return profile?{...session,username:profile.username,userId:profile.userId,role:profile.role}:null;
+    }
     return (await verifyLocalSession(session)) ? session : null;
   } catch (error) {
     if (failOnStoreError) throw error;

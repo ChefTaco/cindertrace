@@ -1,3 +1,4 @@
+import {useApiLocalAuth} from "./api-local-auth";
 import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT } from "jose";
@@ -16,6 +17,11 @@ export async function securityRequest(path: string, init: RequestInit = {}) {
   if (!session) throw new Error("Authentication required");
   if (session.provider === "hive")
     await hiveCredential(session, (process.env["CINDERTRACE_API_URL"] ?? process.env["CONTROL_API_URL"])!);
+  if(useApiLocalAuth()&&session.provider!=="hive"){
+    const origin=new URL((process.env["CINDERTRACE_API_URL"]??process.env["CONTROL_API_URL"])!);
+    if(origin.protocol!=="https:"||origin.username||origin.password||origin.pathname!=="/"||origin.search||origin.hash)throw Error("Verified API origin required");
+    return fetch(`${origin.origin}/api/v1/${path}`,{...init,headers:{"Content-Type":"application/json",Cookie:`${COOKIE_NAME}=${(await cookies()).get(COOKIE_NAME)!.value}`,Origin:process.env["DASHBOARD_PUBLIC_ORIGIN"]!},cache:"no-store",redirect:"error",signal:AbortSignal.timeout(20000)});
+  }
   const secret = process.env["SECURITY_CONSOLE_TOKEN_SECRET"];
   if (!secret || secret.length < 32)
     throw new Error("Security API credential unavailable");

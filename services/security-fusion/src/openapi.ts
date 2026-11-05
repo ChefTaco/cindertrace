@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  localBrowserLoginSchema,localBrowserProfileSchema,
   labTransitionSchema, labDecisionSchema,
   securityFusionEventBatchSchema,
   securityFusionSourceReportSchema,
@@ -66,6 +67,10 @@ export function buildOpenApiSpec() {
       },
     };
   }
+  const localAuthResponses={401:{description:"Invalid credentials or absent/revoked session"},403:{description:"Exact browser origin required"},429:{description:"Durable admission limit reached"},503:{description:"Authentication or audit storage unavailable"}};
+  paths["/api/v1/auth/local/login"]={post:{summary:"Native local sign-in; opt-in API-owned credentials, throttling and durable sessions",requestBody:{required:true,content:{"application/json":{schema:z.toJSONSchema(localBrowserLoginSchema)}}},responses:{200:{description:"Secure HttpOnly SameSite=Lax cookie issued; no-store"},...localAuthResponses}}};
+  paths["/api/v1/auth/local/session"]={get:{summary:"Verify native local session against current credential and revocation generations",security:[{browserCookie:[]}],responses:{200:{description:"Current local identity",content:{"application/json":{schema:z.toJSONSchema(localBrowserProfileSchema)}}},...localAuthResponses}}};
+  paths["/api/v1/auth/local/logout"]={post:{summary:"Durably revoke current session or all local sessions before clearing cookie",security:[{browserCookie:[]}],parameters:[{name:"all",in:"query",schema:{type:"boolean"}}],responses:{200:{description:"Revoked and cookie cleared"},...localAuthResponses}}};
   return {
     openapi: "3.1.0",
     info: {
@@ -77,6 +82,7 @@ export function buildOpenApiSpec() {
     components: {
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer" },
+        browserCookie:{type:"apiKey",in:"cookie",name:"cindertrace_session",description:"Native API-owned local browser session; server checks durable revocation and exact Origin for mutations."},
         collectorSignature: {
           type: "apiKey",
           in: "header",

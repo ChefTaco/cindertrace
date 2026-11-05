@@ -1,15 +1,26 @@
+import {applyRehearsalGuards,isRehearsal} from "./rehearsal.js";
+import {browserAuthEnabled,browserSessionSecret} from "../browser-auth/sessions.js";
+import {credentials} from "../browser-auth/credentials.js";
+import {exactBrowserOrigin} from "../browser-auth/origin.js";
 import { validateLabIsolation } from "./lab-isolation.js";
 /** Validate enabled capabilities without requiring any optional product. */
 import { configuredCollectorCredentials } from "../services/security-fusion-ingest.js";
 export function responseConfigured(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  return env["CINDERTRACE_LAB_ENABLED"] !== "true" && Boolean(env["MAGNUS_RESPONSE_URL"] && env["MAGNUS_RESPONSE_SECRET"]);
+  return !isRehearsal(env) && env["CINDERTRACE_LAB_ENABLED"] !== "true" && Boolean(env["MAGNUS_RESPONSE_URL"] && env["MAGNUS_RESPONSE_SECRET"]);
 }
 export function validateRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
+  applyRehearsalGuards(env);
   validateLabIsolation(env);
+  if(browserAuthEnabled(env)){
+    credentials(env);
+    browserSessionSecret(env);
+    if(!exactBrowserOrigin(env.DASHBOARD_PUBLIC_ORIGIN,env))throw Error("Browser authentication requires an exact HTTPS public origin");
+    if(env.AUTH_RATE_LIMIT_LABEL_KEY!==undefined&&env.AUTH_RATE_LIMIT_LABEL_KEY.length<32)throw Error("Authentication labels require a dedicated secret of at least 32 characters");
+  }
   for (const name of [
     "DATABASE_URL",
     "REDIS_URL",

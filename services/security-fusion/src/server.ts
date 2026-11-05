@@ -1,3 +1,4 @@
+import {isRehearsal,securityWritesEnabled} from "./config/rehearsal.js";
 import { readFile } from "node:fs/promises";
 import { rateLimitMiddleware } from "./middleware/rate-limit.js";
 import { Hono } from "hono";
@@ -9,6 +10,7 @@ import { tokenMatches } from "./middleware/auth.js";
 import { getDb } from "./db/index.js";
 import { renderMetrics } from "./routes/metrics.js";
 import type { AppVariables } from "./types/index.js";
+import { browserAuthRouter } from './browser-auth/routes.js';
 export const app = new Hono<AppVariables>();
 app.onError(errorHandler);
 app.use("*", bodyLimitMiddleware(262144));
@@ -17,6 +19,7 @@ app.use("*", async (c, next) => {
   c.header("Cache-Control", "no-store");
   c.header("X-Content-Type-Options", "nosniff");
 });
+app.route('/api/v1/auth/local', browserAuthRouter());
 app.get("/health", (c) =>
   c.json({ success: true, service: "cindertrace-api" }),
 );
@@ -100,12 +103,12 @@ app.get("/api/v1/security-fusion/summary", async (c) => {
 });
 export const securityFusionWriteGate: MiddlewareHandler = async (c, next) => {
   if (
-    process.env["SECURITY_INGEST_ENABLED"] !== "true" &&
+    (isRehearsal() || process.env["SECURITY_INGEST_ENABLED"] !== "true") &&
     c.req.path.includes("/ingest/")
   )
     return c.json({ error: "Ingestion paused" }, 503);
   if (
-    process.env["SECURITY_WRITES_ENABLED"] !== "true" &&
+    !securityWritesEnabled() &&
     c.req.method !== "GET" &&
     !(c.req.method === "POST" && /^\/api\/v1\/security-fusion\/cases\/[^/]+\/assurance\/exposure\/preview$/.test(c.req.path))
   )
