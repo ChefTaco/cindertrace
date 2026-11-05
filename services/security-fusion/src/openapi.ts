@@ -1,3 +1,4 @@
+import { securityBrowserRoutes } from "@cindertrace/contracts/browser";
 import { z } from "zod";
 import {
   localBrowserLoginSchema,localBrowserProfileSchema,
@@ -66,6 +67,13 @@ export function buildOpenApiSpec() {
         503: { description: "Capability unavailable or writes paused" },
       },
     };
+  }
+  for(const route of securityBrowserRoutes) {
+    const operation=paths["/api/v1/security-fusion"+route.path]?.[route.method.toLowerCase()] as {responses:Record<string,unknown>}|undefined;
+    if(!operation)throw Error('Missing owned browser route in OpenAPI: '+route.method+' '+route.path);
+    const created=route.method==='POST'&&(/\/(investigations|preserve|restart)$/.test(route.path)||route.path==='/lab/runs');
+    const status=created?'201':route.method==='POST'&&route.path.endsWith('/release')?'202':'200';
+    operation.responses[status]={description:'Product-owned browser response',content:{'application/json':{schema:z.toJSONSchema(z.object({success:z.literal(true),data:route.response}))}}};
   }
   const localAuthResponses={401:{description:"Invalid credentials or absent/revoked session"},403:{description:"Exact browser origin required"},429:{description:"Durable admission limit reached"},503:{description:"Authentication or audit storage unavailable"}};
   paths["/api/v1/auth/local/login"]={post:{summary:"Native local sign-in; opt-in API-owned credentials, throttling and durable sessions",requestBody:{required:true,content:{"application/json":{schema:z.toJSONSchema(localBrowserLoginSchema)}}},responses:{200:{description:"Secure HttpOnly SameSite=Lax cookie issued; no-store"},...localAuthResponses}}};

@@ -1,3 +1,4 @@
+import { securityBrowserResponseSchema,securityBrowserRoutes } from "../packages/contracts/dist/browser.js";
 import assert from "node:assert/strict";
 import { randomUUID, createHmac, createHash, randomBytes } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -12,7 +13,7 @@ if (
 process.env.DATABASE_URL = process.env.CINDERTRACE_TEST_DATABASE_URL;
 const root = resolve(import.meta.dirname, ".."),
   api = resolve(root, "services/security-fusion");
-const state = "/state/core-integration-" + randomUUID();
+const state = process.env.CINDERTRACE_TEST_STATE ?? "/state/core-integration-" + randomUUID();
 mkdirSync(state, { recursive: true, mode: 0o700 });
 process.env.AUDIT_LOG_DIR = state + "/audit";
 process.env.SECURITY_FUSION_EVIDENCE_DIR = state + "/evidence";
@@ -49,8 +50,8 @@ try {
   const admin = await token("ADMIN"),
     operator = await token("OPERATOR"),
     viewer = await token("VIEWER");
-  const req = (path, method = "GET", body, bearer = admin) =>
-    app.request("/api/v1/security-fusion" + path, {
+  const req = async (path, method = "GET", body, bearer = admin) => {
+    const response=await app.request("/api/v1/security-fusion" + path, {
       method,
       headers: {
         Authorization: "Bearer " + bearer,
@@ -58,6 +59,11 @@ try {
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
+    const pathname=path.split('?')[0];
+    if(response.ok && securityBrowserRoutes.some(route=>route.method===method && new RegExp('^'+route.path.replace(/\{[^}]+\}/gu,'[^/]+')+'$','u').test(pathname)))securityBrowserResponseSchema('security-fusion'+path,method).parse(await response.clone().json());
+    return response;
+  };
+  for(const path of ['/overview','/cases','/sources','/source-registry','/events','/entities','/evidence','/policies','/audit','/lab'])assert.equal((await req(path)).status,200,path);
   assert.equal((await req("/cases", "GET", undefined, viewer)).status, 403);
   assert.equal(
     (await req("/evidence", "GET", undefined, operator)).status,
@@ -394,6 +400,7 @@ try {
   console.log(
     JSON.stringify({
       standalone: true,
+      ownedBrowserContracts: true,
       signedIngestion: true,
       legacySourceCorrelationPreserved: true,
       replayRejected: true,

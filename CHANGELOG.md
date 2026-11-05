@@ -1,5 +1,9 @@
 # Changelog
 
+- Export immutable browser-safe request/response contracts, document consumed
+  responses in OpenAPI, and verify real API wire records without changing
+  authorization, approval or storage behavior.
+
 ## Unreleased
 
 - Add an isolated PostgreSQL/API and signed HTTPS dispatcher drill for exact-plan

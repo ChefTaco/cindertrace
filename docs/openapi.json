@@ -463,7 +463,86 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "canAdmin": {
+                          "type": "boolean"
+                        },
+                        "runs": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "caseId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "completed",
+                                  "abandoned"
+                                ]
+                              },
+                              "stage": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 3
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "caseId",
+                              "status",
+                              "stage",
+                              "createdAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "canAdmin",
+                        "runs"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -515,6 +594,46 @@
           "200": {
             "description": "Successful response"
           },
+          "201": {
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "caseId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "caseId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "202": {
             "description": "Accepted signed observations"
           },
@@ -559,7 +678,626 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "caseId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "completed",
+                            "abandoned"
+                          ]
+                        },
+                        "stage": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3
+                        },
+                        "scenarioVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "rubricVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "scenarioSha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "rubricSha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "stageTitle": {
+                          "type": "string"
+                        },
+                        "evidenceSha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "summary": {
+                                "type": "string"
+                              },
+                              "observedAt": {
+                                "type": "string"
+                              },
+                              "attributes": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "summary",
+                              "observedAt",
+                              "attributes"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "targets": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "host",
+                                  "account"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "claims": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "enum": [
+                                  "failures_observed",
+                                  "automation_explains_failures",
+                                  "account_compromised",
+                                  "all_activity_benign",
+                                  "unauthorized_privilege_change",
+                                  "suspicious_egress"
+                                ]
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "latestRevision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "checkpoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "investigationId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "revision": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "stage": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 3
+                              },
+                              "authorId": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "evidenceSha256": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "evidenceIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                }
+                              },
+                              "assessment": {
+                                "type": "object",
+                                "properties": {
+                                  "runId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "stage": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 3
+                                  },
+                                  "previousRevision": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "evidenceSha256": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{64}$"
+                                  },
+                                  "compromiseConfidence": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "confidenceRationale": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  },
+                                  "assertions": {
+                                    "maxItems": 6,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "claimId": {
+                                          "type": "string",
+                                          "enum": [
+                                            "failures_observed",
+                                            "automation_explains_failures",
+                                            "account_compromised",
+                                            "all_activity_benign",
+                                            "unauthorized_privilege_change",
+                                            "suspicious_egress"
+                                          ]
+                                        },
+                                        "disposition": {
+                                          "type": "string",
+                                          "enum": [
+                                            "asserted",
+                                            "hypothesis",
+                                            "retracted"
+                                          ]
+                                        },
+                                        "evidenceIds": {
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "claimId",
+                                        "disposition",
+                                        "evidenceIds"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "containment": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "none",
+                                          "host_isolation",
+                                          "credential_rotation"
+                                        ]
+                                      },
+                                      "targetId": {
+                                        "type": "string",
+                                        "maxLength": 160
+                                      },
+                                      "evidenceIds": {
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        }
+                                      },
+                                      "rationale": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 1200
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "targetId",
+                                      "evidenceIds",
+                                      "rationale"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "runId",
+                                  "stage",
+                                  "previousRevision",
+                                  "evidenceSha256",
+                                  "compromiseConfidence",
+                                  "confidenceRationale",
+                                  "assertions",
+                                  "containment"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "evaluation": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "assertedCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "supportedCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "tentativeCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "retractedCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "unsupportedClaims": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "claimId": {
+                                              "type": "string",
+                                              "enum": [
+                                                "failures_observed",
+                                                "automation_explains_failures",
+                                                "account_compromised",
+                                                "all_activity_benign",
+                                                "unauthorized_privilege_change",
+                                                "suspicious_egress"
+                                              ]
+                                            },
+                                            "reason": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "claimId",
+                                            "reason"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "coverage": {
+                                        "type": "object",
+                                        "properties": {
+                                          "supported": {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "available": {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": [
+                                          "supported",
+                                          "available"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "containment": {
+                                        "type": "object",
+                                        "properties": {
+                                          "unnecessary": {
+                                            "type": "boolean"
+                                          },
+                                          "reason": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "unnecessary",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "confidenceDelta": {
+                                        "type": [
+                                          "number",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "assertedCount",
+                                      "supportedCount",
+                                      "tentativeCount",
+                                      "retractedCount",
+                                      "unsupportedClaims",
+                                      "coverage",
+                                      "containment",
+                                      "confidenceDelta"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "investigationId",
+                              "revision",
+                              "stage",
+                              "authorId",
+                              "createdAt",
+                              "evidenceSha256",
+                              "evidenceIds",
+                              "assessment",
+                              "evaluation"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "simulations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "approved_simulated",
+                                  "rejected",
+                                  "invalidated",
+                                  "expired"
+                                ]
+                              },
+                              "planSha256": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "plan": {
+                                "type": "object",
+                                "properties": {
+                                  "simulated": {
+                                    "type": "boolean",
+                                    "const": true
+                                  },
+                                  "runId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "stage": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 3
+                                  },
+                                  "revision": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "evidenceSha256": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{64}$"
+                                  },
+                                  "containment": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "none",
+                                          "host_isolation",
+                                          "credential_rotation"
+                                        ]
+                                      },
+                                      "targetId": {
+                                        "type": "string",
+                                        "maxLength": 160
+                                      },
+                                      "evidenceIds": {
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        }
+                                      },
+                                      "rationale": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 1200
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "targetId",
+                                      "evidenceIds",
+                                      "rationale"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "expiresAt": {
+                                    "type": "string"
+                                  },
+                                  "effect": {
+                                    "type": "string"
+                                  },
+                                  "risk": {
+                                    "type": "string",
+                                    "const": "high"
+                                  },
+                                  "rollback": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "simulated",
+                                  "runId",
+                                  "stage",
+                                  "revision",
+                                  "evidenceSha256",
+                                  "containment",
+                                  "expiresAt",
+                                  "effect",
+                                  "risk",
+                                  "rollback"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "decidedBy": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "planSha256",
+                              "plan",
+                              "decidedBy"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "canAdmin": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "caseId",
+                        "status",
+                        "stage",
+                        "scenarioVersion",
+                        "rubricVersion",
+                        "scenarioSha256",
+                        "rubricSha256",
+                        "createdAt",
+                        "stageTitle",
+                        "evidenceSha256",
+                        "events",
+                        "targets",
+                        "claims",
+                        "latestRevision",
+                        "checkpoints",
+                        "simulations",
+                        "canAdmin"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -632,7 +1370,49 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "stage": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "stage",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -705,7 +1485,49 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "stage": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "stage",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -766,6 +1588,46 @@
           "200": {
             "description": "Successful response"
           },
+          "201": {
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "caseId": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "caseId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "202": {
             "description": "Accepted signed observations"
           },
@@ -810,7 +1672,374 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "runId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "rubricVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "checkpoints": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "investigationId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160
+                              },
+                              "revision": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "stage": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 3
+                              },
+                              "authorId": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "evidenceSha256": {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              "evidenceIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                }
+                              },
+                              "assessment": {
+                                "type": "object",
+                                "properties": {
+                                  "runId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160
+                                  },
+                                  "stage": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 3
+                                  },
+                                  "previousRevision": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "evidenceSha256": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{64}$"
+                                  },
+                                  "compromiseConfidence": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 100
+                                  },
+                                  "confidenceRationale": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 2000
+                                  },
+                                  "assertions": {
+                                    "maxItems": 6,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "claimId": {
+                                          "type": "string",
+                                          "enum": [
+                                            "failures_observed",
+                                            "automation_explains_failures",
+                                            "account_compromised",
+                                            "all_activity_benign",
+                                            "unauthorized_privilege_change",
+                                            "suspicious_egress"
+                                          ]
+                                        },
+                                        "disposition": {
+                                          "type": "string",
+                                          "enum": [
+                                            "asserted",
+                                            "hypothesis",
+                                            "retracted"
+                                          ]
+                                        },
+                                        "evidenceIds": {
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 160
+                                          }
+                                        }
+                                      },
+                                      "required": [
+                                        "claimId",
+                                        "disposition",
+                                        "evidenceIds"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "containment": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "none",
+                                          "host_isolation",
+                                          "credential_rotation"
+                                        ]
+                                      },
+                                      "targetId": {
+                                        "type": "string",
+                                        "maxLength": 160
+                                      },
+                                      "evidenceIds": {
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        }
+                                      },
+                                      "rationale": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 1200
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "targetId",
+                                      "evidenceIds",
+                                      "rationale"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "runId",
+                                  "stage",
+                                  "previousRevision",
+                                  "evidenceSha256",
+                                  "compromiseConfidence",
+                                  "confidenceRationale",
+                                  "assertions",
+                                  "containment"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "evaluation": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "assertedCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "supportedCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "tentativeCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "retractedCount": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "unsupportedClaims": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "claimId": {
+                                              "type": "string",
+                                              "enum": [
+                                                "failures_observed",
+                                                "automation_explains_failures",
+                                                "account_compromised",
+                                                "all_activity_benign",
+                                                "unauthorized_privilege_change",
+                                                "suspicious_egress"
+                                              ]
+                                            },
+                                            "reason": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "required": [
+                                            "claimId",
+                                            "reason"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "coverage": {
+                                        "type": "object",
+                                        "properties": {
+                                          "supported": {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          },
+                                          "available": {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          }
+                                        },
+                                        "required": [
+                                          "supported",
+                                          "available"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "containment": {
+                                        "type": "object",
+                                        "properties": {
+                                          "unnecessary": {
+                                            "type": "boolean"
+                                          },
+                                          "reason": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "unnecessary",
+                                          "reason"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "confidenceDelta": {
+                                        "type": [
+                                          "number",
+                                          "null"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "assertedCount",
+                                      "supportedCount",
+                                      "tentativeCount",
+                                      "retractedCount",
+                                      "unsupportedClaims",
+                                      "coverage",
+                                      "containment",
+                                      "confidenceDelta"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "investigationId",
+                              "revision",
+                              "stage",
+                              "authorId",
+                              "createdAt",
+                              "evidenceSha256",
+                              "evidenceIds",
+                              "assessment",
+                              "evaluation"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "deltas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "revision": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "unsupportedClaims": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "unnecessaryContainment": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "revision",
+                              "unsupportedClaims",
+                              "unnecessaryContainment"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "teachingNotes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "runId",
+                        "rubricVersion",
+                        "checkpoints",
+                        "deltas",
+                        "teachingNotes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -898,7 +2127,48 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "simulated": {
+                          "type": "boolean",
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status",
+                        "simulated"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -935,7 +2205,96 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "verification": {
+                          "type": "object",
+                          "properties": {
+                            "state": {
+                              "type": "string"
+                            },
+                            "legacyEntries": {
+                              "type": "number"
+                            },
+                            "totalEntries": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "state",
+                            "legacyEntries",
+                            "totalEntries"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "timestamp": {
+                                "type": "string"
+                              },
+                              "action": {
+                                "type": "string"
+                              },
+                              "actorId": {
+                                "type": "string"
+                              },
+                              "targetId": {
+                                "type": "string"
+                              },
+                              "verificationState": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "timestamp",
+                              "action",
+                              "actorId",
+                              "targetId",
+                              "verificationState"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "total": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "verification",
+                        "events",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -972,7 +2331,173 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "generatedAt": {
+                          "type": "string"
+                        },
+                        "openCases": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "critical"
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "type": "number"
+                              },
+                              "summary": {
+                                "type": "string"
+                              },
+                              "firstSeenAt": {
+                                "type": "string"
+                              },
+                              "lastSeenAt": {
+                                "type": "string"
+                              },
+                              "recommendedInvestigation": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "evidenceSteps": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "severity",
+                              "status",
+                              "confidence",
+                              "summary",
+                              "firstSeenAt",
+                              "lastSeenAt",
+                              "recommendedInvestigation",
+                              "evidenceSteps"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "sources": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "lastEventAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "lastSuccessAt": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              },
+                              "lastError": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "status"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "bySeverity": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "severity": {
+                                "type": "string"
+                              },
+                              "_count": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  }
+                                },
+                                "required": [
+                                  "id"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "severity",
+                              "_count"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "generatedAt",
+                        "openCases",
+                        "sources",
+                        "bySeverity"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -1009,7 +2534,63 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "lastEventAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "lastSuccessAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "lastError": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -1046,7 +2627,87 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string"
+                          },
+                          "allowedSources": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "schemaVersion": {
+                            "type": "string"
+                          },
+                          "dataClassification": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "cursorHealth": {
+                            "type": "string"
+                          },
+                          "lastReceiptAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "lastSuccessAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "revokedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "displayName",
+                          "allowedSources",
+                          "schemaVersion",
+                          "dataClassification",
+                          "status",
+                          "cursorHealth"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -1129,7 +2790,126 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "eventId": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "observedAt": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "low",
+                              "medium",
+                              "high",
+                              "critical"
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "integritySha256": {
+                            "type": "string"
+                          },
+                          "confidenceContribution": {
+                            "type": "number"
+                          },
+                          "attributes": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "$ref": "#/$defs/__schema0"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "eventId",
+                          "source",
+                          "kind",
+                          "observedAt",
+                          "severity",
+                          "confidence",
+                          "summary",
+                          "integritySha256"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "$defs": {
+                    "__schema0": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -1166,7 +2946,58 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "canonical": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "lastSeenAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "canonical",
+                          "label",
+                          "lastSeenAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -1249,7 +3080,91 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "low",
+                              "medium",
+                              "high",
+                              "critical"
+                            ]
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "firstSeenAt": {
+                            "type": "string"
+                          },
+                          "lastSeenAt": {
+                            "type": "string"
+                          },
+                          "recommendedInvestigation": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "evidenceSteps": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "severity",
+                          "status",
+                          "confidence",
+                          "summary",
+                          "firstSeenAt",
+                          "lastSeenAt",
+                          "recommendedInvestigation",
+                          "evidenceSteps"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -1295,7 +3210,574 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "case": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "severity": {
+                              "type": "string",
+                              "enum": [
+                                "info",
+                                "low",
+                                "medium",
+                                "high",
+                                "critical"
+                              ]
+                            },
+                            "status": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "number"
+                            },
+                            "summary": {
+                              "type": "string"
+                            },
+                            "firstSeenAt": {
+                              "type": "string"
+                            },
+                            "lastSeenAt": {
+                              "type": "string"
+                            },
+                            "recommendedInvestigation": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "evidenceSteps": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "title",
+                            "severity",
+                            "status",
+                            "confidence",
+                            "summary",
+                            "firstSeenAt",
+                            "lastSeenAt",
+                            "recommendedInvestigation",
+                            "evidenceSteps"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "events": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "eventId": {
+                                "type": "string"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "observedAt": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "info",
+                                  "low",
+                                  "medium",
+                                  "high",
+                                  "critical"
+                                ]
+                              },
+                              "confidence": {
+                                "type": "number"
+                              },
+                              "summary": {
+                                "type": "string"
+                              },
+                              "integritySha256": {
+                                "type": "string"
+                              },
+                              "confidenceContribution": {
+                                "type": "number"
+                              },
+                              "attributes": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {
+                                  "$ref": "#/$defs/__schema0"
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "eventId",
+                              "source",
+                              "kind",
+                              "observedAt",
+                              "severity",
+                              "confidence",
+                              "summary",
+                              "integritySha256"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "entities": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "canonical": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "lastSeenAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "type",
+                              "canonical",
+                              "label",
+                              "lastSeenAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "evidence": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sourceLocator": {
+                                "type": "string"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              },
+                              "preservedAt": {
+                                "type": "string"
+                              },
+                              "mediaType": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "sha256",
+                              "preservedAt",
+                              "mediaType"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "investigations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "revision": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "draft": {
+                                "type": "object",
+                                "properties": {
+                                  "lab": {
+                                    "type": "object",
+                                    "properties": {
+                                      "runId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      },
+                                      "stage": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 3
+                                      },
+                                      "previousRevision": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "evidenceSha256": {
+                                        "type": "string",
+                                        "pattern": "^[a-f0-9]{64}$"
+                                      },
+                                      "compromiseConfidence": {
+                                        "type": "number",
+                                        "minimum": 0,
+                                        "maximum": 100
+                                      },
+                                      "confidenceRationale": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 2000
+                                      },
+                                      "assertions": {
+                                        "maxItems": 6,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "claimId": {
+                                              "type": "string",
+                                              "enum": [
+                                                "failures_observed",
+                                                "automation_explains_failures",
+                                                "account_compromised",
+                                                "all_activity_benign",
+                                                "unauthorized_privilege_change",
+                                                "suspicious_egress"
+                                              ]
+                                            },
+                                            "disposition": {
+                                              "type": "string",
+                                              "enum": [
+                                                "asserted",
+                                                "hypothesis",
+                                                "retracted"
+                                              ]
+                                            },
+                                            "evidenceIds": {
+                                              "maxItems": 10,
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                                "maxLength": 160
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "claimId",
+                                            "disposition",
+                                            "evidenceIds"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "containment": {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": [
+                                              "none",
+                                              "host_isolation",
+                                              "credential_rotation"
+                                            ]
+                                          },
+                                          "targetId": {
+                                            "type": "string",
+                                            "maxLength": 160
+                                          },
+                                          "evidenceIds": {
+                                            "maxItems": 10,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1,
+                                              "maxLength": 160
+                                            }
+                                          },
+                                          "rationale": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 1200
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "targetId",
+                                          "evidenceIds",
+                                          "rationale"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    },
+                                    "required": [
+                                      "runId",
+                                      "stage",
+                                      "previousRevision",
+                                      "evidenceSha256",
+                                      "compromiseConfidence",
+                                      "confidenceRationale",
+                                      "assertions",
+                                      "containment"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "summary": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 4000
+                                  },
+                                  "hypotheses": {
+                                    "maxItems": 12,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 1000
+                                    }
+                                  },
+                                  "prioritizedChecks": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 1000
+                                    }
+                                  },
+                                  "proposedActions": {
+                                    "maxItems": 12,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "enum": [
+                                            "service_restart",
+                                            "host_isolation",
+                                            "credential_rotation",
+                                            "network_block",
+                                            "other"
+                                          ]
+                                        },
+                                        "description": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 1200
+                                        },
+                                        "risk": {
+                                          "type": "string",
+                                          "enum": [
+                                            "low",
+                                            "medium",
+                                            "high",
+                                            "critical"
+                                          ]
+                                        },
+                                        "reversible": {
+                                          "type": "boolean"
+                                        },
+                                        "requiresApproval": {
+                                          "type": "boolean",
+                                          "const": true
+                                        },
+                                        "executable": {
+                                          "type": "boolean",
+                                          "const": false
+                                        }
+                                      },
+                                      "required": [
+                                        "kind",
+                                        "description",
+                                        "risk",
+                                        "reversible",
+                                        "requiresApproval",
+                                        "executable"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "evidenceSteps": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 1000
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "summary",
+                                  "hypotheses",
+                                  "prioritizedChecks",
+                                  "proposedActions",
+                                  "evidenceSteps"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "authorId": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "revision",
+                              "draft",
+                              "authorId",
+                              "createdAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "type": "string"
+                              },
+                              "previewSha256": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind",
+                              "status",
+                              "createdAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "labRunId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "responseAvailable": {
+                          "type": "boolean"
+                        },
+                        "canApprove": {
+                          "type": "boolean"
+                        },
+                        "approvalMode": {
+                          "type": "string",
+                          "enum": [
+                            "console",
+                            "external"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "case",
+                        "events",
+                        "entities",
+                        "evidence",
+                        "investigations",
+                        "actions",
+                        "labRunId",
+                        "responseAvailable",
+                        "canApprove",
+                        "approvalMode"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "$defs": {
+                    "__schema0": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -1849,6 +4331,280 @@
           "200": {
             "description": "Successful response"
           },
+          "201": {
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "draft": {
+                          "type": "object",
+                          "properties": {
+                            "lab": {
+                              "type": "object",
+                              "properties": {
+                                "runId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160
+                                },
+                                "stage": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 3
+                                },
+                                "previousRevision": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "evidenceSha256": {
+                                  "type": "string",
+                                  "pattern": "^[a-f0-9]{64}$"
+                                },
+                                "compromiseConfidence": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                },
+                                "confidenceRationale": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 2000
+                                },
+                                "assertions": {
+                                  "maxItems": 6,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "claimId": {
+                                        "type": "string",
+                                        "enum": [
+                                          "failures_observed",
+                                          "automation_explains_failures",
+                                          "account_compromised",
+                                          "all_activity_benign",
+                                          "unauthorized_privilege_change",
+                                          "suspicious_egress"
+                                        ]
+                                      },
+                                      "disposition": {
+                                        "type": "string",
+                                        "enum": [
+                                          "asserted",
+                                          "hypothesis",
+                                          "retracted"
+                                        ]
+                                      },
+                                      "evidenceIds": {
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1,
+                                          "maxLength": 160
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "claimId",
+                                      "disposition",
+                                      "evidenceIds"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "containment": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "none",
+                                        "host_isolation",
+                                        "credential_rotation"
+                                      ]
+                                    },
+                                    "targetId": {
+                                      "type": "string",
+                                      "maxLength": 160
+                                    },
+                                    "evidenceIds": {
+                                      "maxItems": 10,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 160
+                                      }
+                                    },
+                                    "rationale": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "maxLength": 1200
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "targetId",
+                                    "evidenceIds",
+                                    "rationale"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "runId",
+                                "stage",
+                                "previousRevision",
+                                "evidenceSha256",
+                                "compromiseConfidence",
+                                "confidenceRationale",
+                                "assertions",
+                                "containment"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "summary": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4000
+                            },
+                            "hypotheses": {
+                              "maxItems": 12,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              }
+                            },
+                            "prioritizedChecks": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              }
+                            },
+                            "proposedActions": {
+                              "maxItems": 12,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                      "service_restart",
+                                      "host_isolation",
+                                      "credential_rotation",
+                                      "network_block",
+                                      "other"
+                                    ]
+                                  },
+                                  "description": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 1200
+                                  },
+                                  "risk": {
+                                    "type": "string",
+                                    "enum": [
+                                      "low",
+                                      "medium",
+                                      "high",
+                                      "critical"
+                                    ]
+                                  },
+                                  "reversible": {
+                                    "type": "boolean"
+                                  },
+                                  "requiresApproval": {
+                                    "type": "boolean",
+                                    "const": true
+                                  },
+                                  "executable": {
+                                    "type": "boolean",
+                                    "const": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "description",
+                                  "risk",
+                                  "reversible",
+                                  "requiresApproval",
+                                  "executable"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "evidenceSteps": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 1000
+                              }
+                            }
+                          },
+                          "required": [
+                            "summary",
+                            "hypotheses",
+                            "prioritizedChecks",
+                            "proposedActions",
+                            "evidenceSteps"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "authorId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "revision",
+                        "draft",
+                        "authorId",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "202": {
             "description": "Accepted signed observations"
           },
@@ -1903,6 +4659,56 @@
           "200": {
             "description": "Successful response"
           },
+          "201": {
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sourceLocator": {
+                          "type": "string"
+                        },
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "preservedAt": {
+                          "type": "string"
+                        },
+                        "mediaType": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sha256",
+                        "preservedAt",
+                        "mediaType"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "202": {
             "description": "Accepted signed observations"
           },
@@ -1938,7 +4744,57 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "sourceLocator": {
+                            "type": "string"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "preservedAt": {
+                            "type": "string"
+                          },
+                          "mediaType": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sha256",
+                          "preservedAt",
+                          "mediaType"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2012,7 +4868,122 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "eventRetentionDays": {
+                          "type": "number"
+                        },
+                        "preservedEvidenceDays": {
+                          "type": "number"
+                        },
+                        "caseArchiveDays": {
+                          "type": "number"
+                        },
+                        "archiveGraceDays": {
+                          "type": "number"
+                        },
+                        "deletionReceiptDays": {
+                          "type": "number"
+                        },
+                        "perCaseCeilings": {
+                          "type": "object",
+                          "properties": {
+                            "events": {
+                              "type": "number"
+                            },
+                            "entities": {
+                              "type": "number"
+                            },
+                            "relationships": {
+                              "type": "number"
+                            },
+                            "preservedEvidence": {
+                              "type": "number"
+                            },
+                            "preservedEvidenceBytes": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "events",
+                            "entities",
+                            "relationships",
+                            "preservedEvidence",
+                            "preservedEvidenceBytes"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "approvalTtlMinutes": {
+                          "type": "number"
+                        },
+                        "allowedActions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "deniedActions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "isolation": {
+                          "type": "object",
+                          "properties": {
+                            "defaultMinutes": {
+                              "type": "number"
+                            },
+                            "maximumMinutes": {
+                              "type": "number"
+                            },
+                            "defaultPolicy": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "defaultMinutes",
+                            "maximumMinutes",
+                            "defaultPolicy"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "eventRetentionDays",
+                        "preservedEvidenceDays",
+                        "caseArchiveDays",
+                        "archiveGraceDays",
+                        "deletionReceiptDays",
+                        "perCaseCeilings",
+                        "approvalTtlMinutes",
+                        "allowedActions",
+                        "deniedActions",
+                        "isolation"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2095,7 +5066,68 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "$ref": "#/$defs/__schema0"
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "$defs": {
+                    "__schema0": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2479,7 +5511,109 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "previewSha256": {
+                          "type": "string"
+                        },
+                        "preview": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "plan": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "approvalExpiresAt": {
+                          "type": "string"
+                        },
+                        "caseId": {
+                          "type": "string"
+                        },
+                        "commandId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "$defs": {
+                    "__schema0": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2525,7 +5659,109 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "previewSha256": {
+                          "type": "string"
+                        },
+                        "preview": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "plan": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "approvalExpiresAt": {
+                          "type": "string"
+                        },
+                        "caseId": {
+                          "type": "string"
+                        },
+                        "commandId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "$defs": {
+                    "__schema0": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2602,7 +5838,51 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "executionId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "actionId",
+                        "executionId"
+                      ],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2679,7 +5959,51 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "actionId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "executionId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "actionId",
+                        "executionId"
+                      ],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2725,7 +6049,109 @@
         ],
         "responses": {
           "200": {
-            "description": "Successful response"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "previewSha256": {
+                          "type": "string"
+                        },
+                        "preview": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "plan": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "approvalExpiresAt": {
+                          "type": "string"
+                        },
+                        "caseId": {
+                          "type": "string"
+                        },
+                        "commandId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "$defs": {
+                    "__schema0": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           },
           "202": {
             "description": "Accepted signed observations"
@@ -2774,7 +6200,109 @@
             "description": "Successful response"
           },
           "202": {
-            "description": "Accepted signed observations"
+            "description": "Product-owned browser response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "previewSha256": {
+                          "type": "string"
+                        },
+                        "preview": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "plan": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        "approvalExpiresAt": {
+                          "type": "string"
+                        },
+                        "caseId": {
+                          "type": "string"
+                        },
+                        "commandId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ],
+                  "additionalProperties": false,
+                  "$defs": {
+                    "__schema0": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "$ref": "#/$defs/__schema0"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Invalid input"

@@ -1,16 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
 import { getDb } from "../db/index.js";
 import { HttpError } from "../middleware/error-handler.js";
 import { validateStoredContainmentPlan } from "./senti-containment-approval.js";
 import { responseConfigured } from "../config/runtime.js";
-export const adminDecisionSchema = z
-  .object({
-    planSha256: z.string().regex(/^[a-f0-9]{64}$/),
-    previewSha256: z.string().regex(/^[a-f0-9]{64}$/),
-    confirmed: z.literal(true),
-  })
-  .strict();
+export { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
+import { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
 export async function decideAsAdmin(
   actionId: string,
   actorId: string,
