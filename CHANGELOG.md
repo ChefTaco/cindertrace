@@ -1,5 +1,8 @@
 # Changelog
 
+- Support an optional same-origin post-OAuth console landing path, rejecting unsafe
+  redirect configuration before authorization code exchange.
+
 - Add Oathweave OIDC/PKCE sign-in to the retained console with nonce and exact
   identity validation, API-owned encrypted resource sessions, live revocation,
   explicit product links and native recovery authentication. Keep shared identity

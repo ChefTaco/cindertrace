@@ -26,11 +26,20 @@ CINDERTRACE_OATHWEAVE_IDENTITIES_JSON=[{"issuer":"https://identity.example.com",
 CINDERTRACE_API_BROWSER_AUTH=true
 CINDERTRACE_API_URL=https://security-api.example.com
 DASHBOARD_PUBLIC_ORIGIN=https://security.example.com
+# Optional when sharing an ingress with another console; default is /.
+DASHBOARD_LOGIN_RETURN_PATH=/security-fusion
 HIVE_OAUTH_ISSUER=https://identity.example.com
 HIVE_OAUTH_DISCOVERY_URL=https://identity.example.com/api/oathweave/oauth/.well-known/openid-configuration?client_id=hivexui-security-console
 HIVE_OAUTH_CLIENT_ID=hivexui-security-console
 HIVE_OAUTH_API_AUDIENCE=cindertrace
 ```
+
+The optional `DASHBOARD_LOGIN_RETURN_PATH` selects the post-OAuth landing path on
+the configured dashboard HTTPS origin. Its default is `/`. Use a literal absolute
+path such as `/security-fusion`; external URLs, encoded separators, dot traversal,
+queries and fragments are rejected before exchanging the authorization code. The
+ingress must independently route that path to the retained console. This setting
+does not change the exact registered OAuth callback or relax origin validation.
 
 Both services require their existing protected browser-session configuration and
 verified certificate trust. `HIVE_OAUTH_CLIENT_SECRET` must be absent: this flow
