@@ -64,12 +64,14 @@ The API and console must use one application service account. The collector is
 optional; when present, it must use that same account. Other service layouts need
 a separately reviewed installation migration before using this command.
 
-Reviewed native archives, SHA-256 sidecars, and publication reviews are attached
-to [GitHub Releases](https://github.com/ChefTaco/cindertrace/releases). Select the
-archive for your installation's architecture and verify its digest against the
-release review. If building your own archive, build on Linux with the
-installation's architecture and a supported Node version, in a clean checkout
-without installation `.env` files:
+Only the 0.1.0 release has a reviewed native archive, SHA-256 sidecar and
+publication review attached to its
+[GitHub release](https://github.com/ChefTaco/cindertrace/releases); for it, verify
+the archive's digest against the release review. Releases from 0.2.0 on publish only
+the container image and record the source commit, source tree and image digest, so
+build the native archive yourself. Build on Linux with the installation's
+architecture and a supported Node version, in a clean checkout of the release
+commit without installation `.env` files:
 
 ```sh
 npm run release:bundle
