@@ -4,5 +4,6 @@
   "layoutVersion": 1,
   "rollbackCompatible": false,
   "notes": "Adds lab run, checkpoint and simulation tables. Rollback requires a reviewed compatible schema and verified restore; no down migration is applied.",
-  "schemaProfile": "cindertrace-v2"
+  "schemaProfile": "cindertrace-v2",
+  "version": "0.2.2"
 }

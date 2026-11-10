@@ -1,4 +1,4 @@
-FROM postgres:18.6-bookworm@sha256:5c4783a8cc3f0074912164f94dfa1be4e043438f0f707cf968d7af9a0d31a2c8 AS postgres-tools
+ARG RUNTIME_IMAGE=ghcr.io/cheftaco/hive-node-runtime:26.13.0-1@sha256:48948514bce59a27f8ee2a3eabaea0a04cbfa87e087297a52f8501c0d465c84f
 FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS build
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /build
@@ -11,23 +11,14 @@ COPY packages/integrations/package.json packages/integrations/package.json
 RUN npm ci
 COPY . .
 RUN npm run build && npm run stage -w @cindertrace/console && node scripts/stage-runtime.mjs && node scripts/check-private.mjs --artifact artifacts/runtime
-FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates postgresql-client openssl && rm -rf /var/lib/apt/lists/*
-COPY --from=postgres-tools /usr/lib/postgresql/18/bin/pg_dump /usr/local/bin/pg_dump
-COPY --from=postgres-tools /usr/lib/postgresql/18/bin/pg_restore /usr/local/bin/pg_restore
-COPY --from=postgres-tools /usr/lib/postgresql/18/bin/psql /usr/local/bin/psql
-COPY --from=postgres-tools /usr/lib/*-linux-gnu/libpq.so.5.18 /tmp/libpq/
-# Debian's library directory is named after the machine architecture.
-RUN mv /tmp/libpq/libpq.so.5.18 "/usr/lib/$(uname -m)-linux-gnu/libpq.so.5" && rmdir /tmp/libpq
+FROM ${RUNTIME_IMAGE} AS runtime
+USER root
+ENV PATH=/usr/libexec/postgresql18:$PATH
+# Maintained PostgreSQL clients use the final distribution's compatible libraries.
+RUN apk add --no-cache postgresql-18-client-base && pg_dump --version && pg_restore --version && psql --version
 WORKDIR /app
 COPY --from=build /build/artifacts/runtime ./
-# The runtime runs only node. Remove the base image's package managers (npm and
-# corepack bundle vulnerable dependencies) and apt; dpkg's database stays so
-# scanners still see the installed OS packages. Compose's migrate service keeps
-# its `npm run db:migrate` command through a node-only compatibility script.
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg \
- && dpkg --purge --force-remove-protected --force-remove-essential apt libapt-pkg6.0 \
- && rm -rf /etc/apt /var/lib/apt /var/cache/apt /var/log/apt
+# Preserve the node-only migration compatibility command; npm is absent from the runtime.
 COPY --chmod=0755 scripts/npm-compat.sh /usr/local/bin/npm
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
