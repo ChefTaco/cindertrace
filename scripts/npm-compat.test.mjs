@@ -18,13 +18,12 @@ test('runtime npm compatibility script rejects every command except the Compose 
   assert.match(readFileSync(script, 'utf8'), /cd \/app\/services\/security-fusion\n  exec node scripts\/apply-migrations\.mjs\n/);
 });
 
-test('runtime image removes package managers and apt and installs only the compatibility script', () => {
+test('runtime uses the pinned maintained base and keeps only the migration compatibility command', () => {
   const dockerfile = readFileSync(resolve(root, 'Dockerfile'), 'utf8');
+  assert.match(dockerfile, /ARG RUNTIME_IMAGE=ghcr\.io\/cheftaco\/hive-node-runtime:26\.[0-9.]+-[0-9]+@sha256:[a-f0-9]{64}/);
   const runtime = dockerfile.slice(dockerfile.lastIndexOf('\nFROM '));
-  const removal = runtime.indexOf('rm -rf /usr/local/lib/node_modules/npm');
-  assert(removal > 0);
-  assert(runtime.indexOf('apt-get') < removal, 'apt is used only before it is purged');
-  assert.match(runtime, /dpkg --purge --force-remove-protected --force-remove-essential apt libapt-pkg6\.0/);
-  assert(runtime.indexOf('COPY --chmod=0755 scripts/npm-compat.sh /usr/local/bin/npm') > removal);
-  assert(runtime.lastIndexOf('apt-get') < removal);
+  assert.match(runtime, /FROM \$\{RUNTIME_IMAGE\} AS runtime/);
+  assert.doesNotMatch(runtime, /apt-get|dpkg|COPY --from=.*\/(usr|lib|bin)/);
+  assert.match(runtime, /apk add --no-cache postgresql-18-client-base/);
+  assert.match(runtime, /COPY --chmod=0755 scripts\/npm-compat.sh \/usr\/local\/bin\/npm/);
 });

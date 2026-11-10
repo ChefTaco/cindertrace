@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2] - 2026-11-10
+
+### Security
+
+- Run containers on the pinned, patched Node 26 runtime with maintained system libraries.
+- Use the maintained PostgreSQL 18 client pair for backup and restore. Restore archives with the matching or newer `pg_restore`; older clients may reject the archive header.
+
 ## 0.2.1 - 2026-11-05
 
 ### Security
