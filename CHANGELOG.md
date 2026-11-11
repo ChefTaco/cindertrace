@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.2.3] - 2026-11-11
+
 ### Security
 
 - Require patched Node.js 24.22.3 or 26.13.1 for supported runtime lines and update container and CI pins.
