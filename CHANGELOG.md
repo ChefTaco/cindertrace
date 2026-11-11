@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Security
+
+- Require patched Node.js 24.22.3 or 26.13.1 for supported runtime lines and update container and CI pins.
+- Upgrade Hono to 4.13.18 to include the tiny-chunk request-body memory exhaustion fix (GHSA-39q9-qp46-w8xg).
+
+### Fixed
+
 - Keep native release code readable by the application account when the upgrade runs under a restrictive umask. Verified upload snapshots and recovery records retain their private permissions; archive extraction still rejects escaping links.
 
 ## [0.2.2] - 2026-11-10

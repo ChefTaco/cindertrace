@@ -173,9 +173,9 @@ export function recoveryArchiveName(now = new Date()) {
 export function assertUpgradeNode(version = process.versions.node) {
   const [major, minor, patch] = version.split(".").map(Number);
   assert(
-    (major === 24 && (minor > 22 || (minor === 22 && patch >= 1))) ||
-      (major === 26 && minor >= 13),
-    "Upgrade tooling requires Node >=24.22.1 on the 24.x line or >=26.13.0 on the 26.x line",
+    (major === 24 && (minor > 22 || (minor === 22 && patch >= 3))) ||
+      (major === 26 && (minor > 13 || (minor === 13 && patch >= 1))),
+    "Upgrade tooling requires Node >=24.22.3 on the 24.x line or >=26.13.1 on the 26.x line",
   );
 }
 

@@ -12,7 +12,7 @@ and execute explicitly approved host responses. Both integrations are optional.
 
 ## Install
 
-Requirements: Node.js 24.22.1 or supported Node.js 26, npm, OpenSSL, and Docker
+Requirements: Node.js 24.22.3+ on the 24.x line or 26.13.1+ on the 26.x line, npm, OpenSSL, and Docker
 with Compose. From a clean checkout of a release tag, for example
 `git clone --branch v0.2.1 https://github.com/ChefTaco/cindertrace.git`:
 
