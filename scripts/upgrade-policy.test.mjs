@@ -102,8 +102,8 @@ test("upgrade archives use the supported off-host receiver name contract", () =>
 });
 
 test("unsupported runtimes fail before native dependency activation", () => {
-  for (const v of ["24.22.1", "24.22.2", "26.13.0"]) assertUpgradeNode(v);
-  for (const v of ["22.15.0", "24.22.0", "26.12.0", "25.1.0"])
+  for (const v of ["24.22.3", "24.23.0", "26.13.1", "26.14.0"]) assertUpgradeNode(v);
+  for (const v of ["22.15.0", "24.22.0", "24.22.1", "24.22.2", "26.12.0", "26.13.0", "25.1.0"])
     assert.throws(() => assertUpgradeNode(v));
 });
 

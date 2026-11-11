@@ -4,7 +4,7 @@
   "description": "Cindertrace api",
   "type": "module",
   "engines": {
-    "node": "^24.22.1 || ^26.13.0"
+    "node": "^24.22.3 || ^26.13.1"
   },
   "scripts": {
     "build": "node ../../scripts/clean-build.mjs && prisma generate && tsc --build",
@@ -22,7 +22,7 @@
     "@prisma/client": "7.10.1",
     "argon2": "0.45.1",
     "dotenv": "18.0.9",
-    "hono": "4.13.16",
+    "hono": "4.13.18",
     "ioredis": "6.0.0",
     "jose": "6.2.13",
     "ky": "2.2.0",

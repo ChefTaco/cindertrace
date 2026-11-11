@@ -19,8 +19,8 @@ git rev-parse 'v0.1.0^{commit}'
 Pass the resulting 40-character commit as `--to`. The command does not select
 `latest`, reset your checkout, replace secrets, or regenerate installation keys.
 Obtain the current upgrade tooling in a separate trusted checkout if the installed
-source predates the upgrade command. Supported Node versions are 24.22.1 or later
-on the 24.x line, or 26.13.0 or later on the 26.x line. Build and review release
+source predates the upgrade command. Supported Node versions are 24.22.3 or later
+on the 24.x line, or 26.13.1 or later on the 26.x line. Build and review release
 payloads before publishing them, following the [publication gate](PUBLISHING.md).
 
 ## Compose
