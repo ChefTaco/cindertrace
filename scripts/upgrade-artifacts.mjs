@@ -6,6 +6,31 @@ const metadata = new Set([
   "cindertrace-release.json",
   ".cindertrace-archive.sha256",
 ]);
+
+/** Release code must be readable by the application account even under a private umask.
+ * Keep the verified archive and upgrade record private; only the public payload is shared.
+ */
+export function runtimeExtractionCommand(archive, directory) {
+  const script = [
+    "import os,sys,tarfile",
+    "os.umask(0o022)",
+    "os.chmod(sys.argv[2],0o755)",
+    "def public_code(member,destination):",
+    "    member=tarfile.data_filter(member,destination)",
+    "    if member is not None:",
+    "        if member.isdir(): member.mode=0o755",
+    "        elif member.isfile(): member.mode=0o755 if member.mode & 0o111 else 0o644",
+    "    return member",
+    "tarfile.open(sys.argv[1]).extractall(sys.argv[2],filter=public_code)",
+  ].join("\n");
+  return [
+    "python3",
+    "-c",
+    script,
+    archive,
+    directory,
+  ];
+}
 export function runtimeFileManifest(root) {
   root = resolve(root);
   const result = [];

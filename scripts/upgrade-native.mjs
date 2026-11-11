@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   verifyRuntimeFiles,
   copyVerifiedRuntimeArchive,
+  runtimeExtractionCommand,
 } from "./upgrade-artifacts.mjs";
 import {
   readFileSync,
@@ -208,13 +209,7 @@ export class NativeInstallation {
       );
     } else {
       mkdirSync(this.candidate, { mode: 0o755 });
-      await this.command([
-        "python3",
-        "-c",
-        "import tarfile,sys;tarfile.open(sys.argv[1]).extractall(sys.argv[2],filter='data')",
-        archive,
-        this.candidate,
-      ]);
+      await this.command(runtimeExtractionCommand(archive, this.candidate));
     }
     const manifest = JSON.parse(
       readFileSync(join(this.candidate, "cindertrace-release.json")),

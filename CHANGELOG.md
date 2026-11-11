@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Keep native release code readable by the application account when the upgrade runs under a restrictive umask. Verified upload snapshots and recovery records retain their private permissions; archive extraction still rejects escaping links.
+
 ## [0.2.2] - 2026-11-10
 
 ### Security
