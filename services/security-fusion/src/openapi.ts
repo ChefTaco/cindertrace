@@ -1,4 +1,4 @@
-import { securityBrowserRoutes } from "@cindertrace/contracts/browser";
+import { hiveEventsFeedRoute, securityBrowserRoutes } from "@cindertrace/contracts/browser";
 import { z } from "zod";
 import {
   localBrowserLoginSchema,localBrowserProfileSchema,
@@ -99,6 +99,9 @@ export function buildOpenApiSpec() {
     const status=created?'201':route.method==='POST'&&route.path.endsWith('/release')?'202':'200';
     operation.responses[status]={description:'Product-owned browser response',content:{'application/json':{schema:z.toJSONSchema(z.object({success:z.literal(true),data:route.response}))}}};
   }
+  paths[hiveEventsFeedRoute.path]={get:{summary:"HiveEvent v1 feed for the HiveXUI inbox: case and containment events from the last 14 days, oldest first by (occurredAt, id); same authentication and roles as case reads",tags:["Hive"],security:[{bearerAuth:[]},{browserCookie:[]}],
+    parameters:[{name:"after",in:"query",required:false,description:"Opaque cursor from a previous page's nextCursor; the page holds events strictly after it.",schema:{type:"string",pattern:"^[A-Za-z0-9._~:-]{1,512}$"}},{name:"limit",in:"query",required:false,description:"Page size, 1 to 200; default 50.",schema:{type:"integer",minimum:1,maximum:200,default:50}}],
+    responses:{200:{description:"Feed page; nextCursor is null when caught up",content:{"application/json":{schema:z.toJSONSchema(hiveEventsFeedRoute.response)}}},400:{description:"Malformed cursor or limit"},401:{description:"Missing or invalid credentials"},403:{description:"Role or service credential denied"}}}};
   const localAuthResponses={401:{description:"Invalid credentials or absent/revoked session"},403:{description:"Exact browser origin required"},429:{description:"Durable admission limit reached"},503:{description:"Authentication or audit storage unavailable"}};
   paths["/api/v1/auth/local/login"]={post:{summary:"Native local sign-in; opt-in API-owned credentials, throttling and durable sessions",requestBody:{required:true,content:{"application/json":{schema:z.toJSONSchema(localBrowserLoginSchema)}}},responses:{200:{description:"Secure HttpOnly SameSite=Lax cookie issued; no-store"},...localAuthResponses}}};
   paths["/api/v1/auth/oathweave/session"]={post:{summary:"Exchange an independently verified, explicitly linked Oathweave resource identity for a short-lived API-owned browser cookie; validates online revocation on every use",security:[{bearerAuth:[]}],responses:{200:{description:"Secure HttpOnly SameSite=Lax cookie; encrypted credential remains server-owned"},...localAuthResponses}}};

@@ -455,6 +455,32 @@ try {
   } finally {
     globalThis.fetch = originalFetch;
   }
+  // HiveEvent v1 feed over the records above, against PostgreSQL.
+  const { validateHiveEvent } = await import("@hivemagnus/hive-common/contracts");
+  const { hiveEventPageSchema } = await import("../packages/contracts/dist/browser.js");
+  const feed = async (query = "", bearer = admin) =>
+    app.request("/api/v1/hive/events" + query, { headers: { Authorization: "Bearer " + bearer } });
+  assert.equal((await feed("", viewer)).status, 403);
+  assert.equal((await app.request("/api/v1/hive/events")).status, 401);
+  assert.equal((await feed("?after=not*a*cursor")).status, 400);
+  assert.equal((await feed("?limit=0")).status, 400);
+  const full = await (await feed("?limit=200")).json();
+  hiveEventPageSchema.parse(full);
+  assert.equal(full.nextCursor, null);
+  for (const event of full.data) assert.equal(validateHiveEvent(event, { strict: true }).ok, true);
+  const types = new Set(full.data.map((event) => event.type));
+  for (const type of ["case.opened", "containment.approval.requested", "containment.approval.approved", "containment.action.succeeded", "containment.action.failed"])
+    assert.ok(types.has(type), type);
+  assert.ok(full.data.some((event) => event.id === `cindertrace:case:${caseId}:opened` && event.link.path === `/security-fusion/cases/${caseId}`));
+  assert.deepEqual((await (await feed("?limit=200", operator)).json()).data.map((event) => event.id), full.data.map((event) => event.id));
+  const paged = [];
+  for (let after = null, guard = 0; guard < 500; guard++) {
+    const page = await (await feed("?limit=1" + (after ? "&after=" + after : ""))).json();
+    paged.push(...page.data.map((event) => event.id));
+    if (!page.nextCursor) break;
+    after = page.nextCursor;
+  }
+  assert.deepEqual(paged, full.data.map((event) => event.id));
   console.log(
     JSON.stringify({
       standalone: true,
@@ -470,6 +496,7 @@ try {
       dispatchDisabled: true,
       globalWritePausePreventsDispatch: true,
       restartVerificationRecovery: true,
+      hiveEventFeed: true,
     }),
   );
 } finally {

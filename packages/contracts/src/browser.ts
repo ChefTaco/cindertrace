@@ -45,6 +45,24 @@ export const securityBrowserRoutes:{method:string;path:string;response:z.ZodType
  ...['advance','complete'].map(suffix=>({method:'POST',path:'/lab/runs/{id}/'+suffix,request:labTransitionSchema,response:z.object({id,stage:z.number().int(),status:text})})),
  {method:'POST',path:'/lab/runs/{id}/simulations/{simulationId}/decision',request:labDecisionSchema,response:z.object({id,status:text,simulated:z.literal(true)})},
 ];
+/** HiveEvent v1 feed served at /api/v1/hive/events (outside the /api/v1/security-fusion routes). */
+export const CINDERTRACE_HIVE_EVENT_TYPES=['case.opened','case.reopened','case.severity.raised','case.closed','containment.approval.requested','containment.approval.approved','containment.approval.rejected','containment.action.succeeded','containment.action.failed','containment.action.unknown','containment.release.requested','containment.action.released'] as const;
+const hiveIdentifier=z.string().regex(/^[a-z0-9_-]{2,32}$/u);
+export const hiveEventSchema=z.object({
+ id:z.string().min(1).max(128).regex(/^cindertrace:[A-Za-z0-9._:-]+$/u),
+ product:z.literal('cindertrace'),
+ type:z.enum(CINDERTRACE_HIVE_EVENT_TYPES),
+ severity:z.enum(['info','warning','critical']),
+ title:z.string().min(1).max(200),
+ summary:z.string().max(2000),
+ occurredAt:z.iso.datetime({precision:3}),
+ subject:z.object({actorId:hiveIdentifier.optional(),agentRef:z.string().regex(/^[a-z0-9_-]{2,32}~[a-z0-9_-]{2,32}$/u).optional(),nodeId:hiveIdentifier.optional()}).strict().optional(),
+ link:z.object({product:z.literal('cindertrace'),path:z.string().regex(/^\/security-fusion\/cases\/[^/?#\\]+$/u).max(1024)}).strict(),
+ sourceRef:z.string().min(1).max(256).optional(),
+}).strict();
+export const hiveEventPageSchema=z.object({data:z.array(hiveEventSchema),nextCursor:z.string().nullable()}).strict();
+export const hiveEventsFeedRoute={method:'GET',path:'/api/v1/hive/events',query:z.object({after:z.string().regex(/^[A-Za-z0-9._~:-]{1,512}$/u).optional(),limit:z.coerce.number().int().min(1).max(200).optional()}),response:hiveEventPageSchema} as const;
+export type HiveEventRecord=z.infer<typeof hiveEventSchema>;
 export function securityBrowserRoute(path:string,method='GET') {
  if(!path.startsWith('security-fusion/') || /[\\#]/u.test(path) || path.includes('..'))throw Error('Invalid security browser path');
  const pathname='/'+path.slice('security-fusion/'.length).split('?')[0];

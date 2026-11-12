@@ -6371,6 +6371,191 @@
         }
       }
     },
+    "/api/v1/hive/events": {
+      "get": {
+        "summary": "HiveEvent v1 feed for the HiveXUI inbox: case and containment events from the last 14 days, oldest first by (occurredAt, id); same authentication and roles as case reads",
+        "tags": [
+          "Hive"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "browserCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Opaque cursor from a previous page's nextCursor; the page holds events strictly after it.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._~:-]{1,512}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size, 1 to 200; default 50.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed page; nextCursor is null when caught up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^cindertrace:[A-Za-z0-9._:-]+$"
+                          },
+                          "product": {
+                            "type": "string",
+                            "const": "cindertrace"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "case.opened",
+                              "case.reopened",
+                              "case.severity.raised",
+                              "case.closed",
+                              "containment.approval.requested",
+                              "containment.approval.approved",
+                              "containment.approval.rejected",
+                              "containment.action.succeeded",
+                              "containment.action.failed",
+                              "containment.action.unknown",
+                              "containment.release.requested",
+                              "containment.action.released"
+                            ]
+                          },
+                          "severity": {
+                            "type": "string",
+                            "enum": [
+                              "info",
+                              "warning",
+                              "critical"
+                            ]
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "summary": {
+                            "type": "string",
+                            "maxLength": 2000
+                          },
+                          "occurredAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                          },
+                          "subject": {
+                            "type": "object",
+                            "properties": {
+                              "actorId": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9_-]{2,32}$"
+                              },
+                              "agentRef": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9_-]{2,32}~[a-z0-9_-]{2,32}$"
+                              },
+                              "nodeId": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9_-]{2,32}$"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "link": {
+                            "type": "object",
+                            "properties": {
+                              "product": {
+                                "type": "string",
+                                "const": "cindertrace"
+                              },
+                              "path": {
+                                "type": "string",
+                                "maxLength": 1024,
+                                "pattern": "^\\/security-fusion\\/cases\\/[^/?#\\\\]+$"
+                              }
+                            },
+                            "required": [
+                              "product",
+                              "path"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "sourceRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "product",
+                          "type",
+                          "severity",
+                          "title",
+                          "summary",
+                          "occurredAt",
+                          "link"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed cursor or limit"
+          },
+          "401": {
+            "description": "Missing or invalid credentials"
+          },
+          "403": {
+            "description": "Role or service credential denied"
+          }
+        }
+      }
+    },
     "/api/v1/auth/local/login": {
       "post": {
         "summary": "Native local sign-in; opt-in API-owned credentials, throttling and durable sessions",

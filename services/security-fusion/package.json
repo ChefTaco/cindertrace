@@ -17,7 +17,7 @@
   "dependencies": {
     "@cindertrace/contracts": "0.4.0",
     "@cindertrace/integrations": "0.4.0",
-    "@hivemagnus/hive-common": "^0.1.0",
+    "@hivemagnus/hive-common": "^0.4.0",
     "@hono/node-server": "2.1.5",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Add `GET /api/v1/hive/events`, a HiveEvent v1 feed for the HiveXUI inbox. It derives events from records Cindertrace already stores: case activity (`case.opened`, `case.reopened`, `case.severity.raised`, `case.closed`, containment approvals and rejections, containment results and isolation releases) and containment approval requests (`containment.approval.requested`). Case severity maps to `info` (info, low), `warning` (medium, high) or `critical`; failed and unknown containment outcomes are `critical`. Links point to HiveXUI's `/security-fusion/cases/<id>`, and a case's single agent entity sets `subject.actorId`, `agentRef` and `nodeId`. Pages are oldest first by `(occurredAt, id)` with an opaque cursor, cover the last 14 days, and are validated with `@hivemagnus/hive-common` before they are served. Authentication and roles match case reads: ADMIN and OPERATOR, 403 for VIEWER and for endpoint-scoped service credentials.
+- Publish the feed's route and `hiveEventSchema` in the browser contracts and OpenAPI.
+
+### Changed
+
+- Require `@hivemagnus/hive-common` ^0.4.0 in the API.
+
+No database migration is required.
+
 ## [0.4.0] - 2026-11-12
 
 ### Added
