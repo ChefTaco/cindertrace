@@ -229,7 +229,7 @@ try {
     [agentCaseIds[0]],
   );
   assert.deepEqual((await (await casesFor("agent", "actor:fixture-missing")).json()).data, []);
-  assert.deepEqual((await (await casesFor("agent", "actor:fixture-lead")).json()).data[0].title.includes("agent-node.example.com"), true);
+  assert.match((await (await casesFor("agent", "actor:fixture-lead")).json()).data[0].title, /\bagent-node\.example\.com\b/);
   assert.equal((await casesFor("agent", "fixture-lead")).status, 400);
   assert.equal((await req("/cases?entityType=agent", "GET")).status, 400);
   assert.equal((await casesFor("agent", "actor:fixture-lead", viewer)).status, 403);
