@@ -18,16 +18,82 @@ export const securityFusionSourceSchema = z.enum([
   'mattermost',
 ]);
 export const securityFusionSeveritySchema = z.enum(['info', 'low', 'medium', 'high', 'critical']);
-export const securityFusionEntityTypeSchema = z.enum(['user', 'host', 'device', 'ip', 'service', 'account', 'domain']);
+export const securityFusionEntityTypeSchema = z.enum(['user', 'host', 'device', 'ip', 'service', 'account', 'domain', 'agent']);
 export const securityFusionCaseStatusSchema = z.enum([
   'new', 'triage', 'investigating', 'contained', 'monitoring', 'resolved', 'false_positive',
 ]);
+
+/** HiveMem-format agent (actor) ID. */
+export const agentActorIdSchema = z.string().regex(/^[a-z0-9_-]{2,32}$/);
+/** Magnus node ID; `~` separates it from the profile in an agent reference. */
+export const magnusNodeIdSchema = z.string().regex(/^[A-Za-z0-9._-]{1,128}$/);
+/** Ardent profile ID on a Magnus node. */
+export const agentProfileIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
+/** `<magnusNodeId>~<profile>`. */
+export const agentRefSchema = z.string().regex(/^[A-Za-z0-9._-]{1,128}~[A-Za-z0-9_-]{1,64}$/);
+
+export type AgentEntityValue =
+  | { kind: 'actor'; actorId: string; value: string }
+  | { kind: 'agent-ref'; agentRef: string; nodeId: string; profile: string; value: string }
+  | { kind: 'magnus-node'; nodeId: string; value: string };
+
+export const agentEntityValue = {
+  actor: (actorId: string) => `actor:${actorId}`,
+  agentRef: (agentRef: string) => `agent-ref:${agentRef}`,
+  magnusNode: (nodeId: string) => `magnus-node:${nodeId}`,
+} as const;
+
+/**
+ * Parse an `agent` entity value. The canonical form is `actor:<actorId>`;
+ * `agent-ref:<nodeId>~<profile>` and `magnus-node:<nodeId>` are aliases.
+ * Values are exact: actor IDs are lowercase by format and Magnus/Ardent IDs keep their case.
+ */
+export function parseAgentEntityValue(raw: string): AgentEntityValue | null {
+  const value = raw.trim();
+  const separator = value.indexOf(':');
+  if (separator < 0) return null;
+  const prefix = value.slice(0, separator);
+  const rest = value.slice(separator + 1);
+  if (prefix === 'actor' && agentActorIdSchema.safeParse(rest).success)
+    return { kind: 'actor', actorId: rest, value };
+  if (prefix === 'agent-ref' && agentRefSchema.safeParse(rest).success) {
+    const [nodeId, profile] = rest.split('~') as [string, string];
+    return { kind: 'agent-ref', agentRef: rest, nodeId, profile, value };
+  }
+  if (prefix === 'magnus-node' && magnusNodeIdSchema.safeParse(rest).success)
+    return { kind: 'magnus-node', nodeId: rest, value };
+  return null;
+}
 
 export const securityFusionEntityRefSchema = z.object({
   type: securityFusionEntityTypeSchema,
   value: z.string().min(1).max(512),
   label: z.string().min(1).max(160).optional(),
+}).superRefine((ref, context) => {
+  if (ref.type !== 'agent') return;
+  const parsed = parseAgentEntityValue(ref.value);
+  // An agent entity names an agent: a canonical actor ID, or a node profile reference.
+  if (!parsed || parsed.kind === 'magnus-node')
+    context.addIssue({
+      code: 'custom',
+      path: ['value'],
+      message: 'agent entity value must be actor:<actorId> or agent-ref:<nodeId>~<profile>',
+    });
 });
+
+/** Query for cases involving one entity: `GET /cases?entityType=&entity=`. Both or neither. */
+export const securityFusionCaseEntityFilterSchema = z.object({
+  entityType: securityFusionEntityTypeSchema,
+  entity: z.string().trim().min(1).max(512),
+}).superRefine((filter, context) => {
+  if (filter.entityType === 'agent' && !parseAgentEntityValue(filter.entity))
+    context.addIssue({
+      code: 'custom',
+      path: ['entity'],
+      message: 'agent entity must be actor:<actorId>, agent-ref:<nodeId>~<profile> or magnus-node:<nodeId>',
+    });
+});
+export type SecurityFusionCaseEntityFilter = z.infer<typeof securityFusionCaseEntityFilterSchema>;
 
 export const securityFusionEventSchema = z.object({
   schemaVersion: z.literal('1.0'),

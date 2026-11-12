@@ -5,6 +5,7 @@ import { validateActionTarget } from "../services/targets.js";
 import { createHmac, randomBytes } from "node:crypto";
 import { Hono, type Context } from "hono";
 import {
+  securityFusionCaseEntityFilterSchema,
   securityFusionContainmentPreviewSchema,
   securityFusionEventBatchSchema,
   securityFusionInvestigationDraftSchema,
@@ -27,6 +28,7 @@ import { queryAuditEvents, logAuditEvent } from "../services/audit-service.js";
 import {
   ingestSecurityFusionBatch,
   preserveEvidence,
+  resolveCaseFilterEntityIds,
   saveInvestigation,
   SECURITY_FUSION_RETENTION_POLICY,
   sha256,
@@ -625,10 +627,41 @@ securityFusionRouter.get("/entities/:id", async (c) => {
 securityFusionRouter.get("/cases", async (c) => {
   const status = c.req.query("status");
   const archived = c.req.query("archived") === "true";
+  const entityType = c.req.query("entityType");
+  const entity = c.req.query("entity");
+  let caseIds: string[] | undefined;
+  if (entityType !== undefined || entity !== undefined) {
+    const filter = securityFusionCaseEntityFilterSchema.safeParse({ entityType, entity });
+    if (!filter.success)
+      throw new HttpError(
+        400,
+        "INVALID_ENTITY_FILTER",
+        "entityType and entity must be given together and name a supported entity",
+      );
+    const entityIds = await resolveCaseFilterEntityIds(
+      filter.data.entityType,
+      filter.data.entity,
+    );
+    if (entityIds.length === 0) return c.json({ success: true, data: [] });
+    // Join through case entity links in the database so the newest 100 cases are exact.
+    const linked = await getDb().$queryRaw<Array<{ id: string }>>`
+      SELECT c."id" FROM "security_fusion_cases" c
+      WHERE (${status || null}::text IS NULL OR c."status" = ${status || null}::text)
+        AND (CASE WHEN ${archived}::boolean THEN c."archivedAt" IS NOT NULL ELSE c."archivedAt" IS NULL END)
+        AND EXISTS (
+          SELECT 1 FROM "security_fusion_case_entities" ce
+          WHERE ce."caseId" = c."id" AND ce."entityId" = ANY(${entityIds}::text[])
+        )
+      ORDER BY c."lastSeenAt" DESC
+      LIMIT 100`;
+    caseIds = linked.map((row) => row.id);
+    if (caseIds.length === 0) return c.json({ success: true, data: [] });
+  }
   const rows = await getDb().securityFusionCase.findMany({
     where: {
       ...(status ? { status } : {}),
       archivedAt: archived ? { not: null } : null,
+      ...(caseIds ? { id: { in: caseIds } } : {}),
     },
     orderBy: { lastSeenAt: "desc" },
     take: 100,

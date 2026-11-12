@@ -25,6 +25,13 @@ import {
   type DeletionReceiptInput,
 } from "./security-fusion-receipt-chain.js";
 import { ensurePrivateEvidenceDirectory } from "./security-fusion-evidence-integrity.js";
+import {
+  agentIdentityFromAttributes,
+  derivedMagnusAgentEntity,
+  resolveAgentEntityIds,
+  upsertAgentEntity,
+  type AgentIdentity,
+} from "./agent-entities.js";
 
 const severityRank: Record<string, number> = {
   info: 0,
@@ -109,9 +116,38 @@ export function sha256(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function canonicalEntity(type: string, value: string): string {
+export function canonicalEntity(type: string, value: string): string {
+  // Agent values are exact: actor IDs are lowercase by format; node and profile IDs keep their case.
+  if (type === "agent") return value.trim();
   const normalized = value.trim().toLowerCase();
   return type === "domain" ? normalized.replace(/\.$/, "") : normalized;
+}
+
+/** Agent entities join cases; they anchor a case only when the event names nothing else. */
+export function correlationAnchor(
+  entities: SecurityFusionEvent["entities"],
+): SecurityFusionEvent["entities"][number] | undefined {
+  const sorted = [...entities].sort((a, b) =>
+    `${a.type}:${a.value}`.localeCompare(`${b.type}:${b.value}`),
+  );
+  return sorted.find((entity) => entity.type !== "agent") ?? sorted[0];
+}
+
+/** Entity IDs for `GET /cases?entityType=&entity=`, using the same normalization as ingest. */
+export async function resolveCaseFilterEntityIds(
+  type: string,
+  value: string,
+): Promise<string[]> {
+  if (type === "agent") return resolveAgentEntityIds(value);
+  const rows = await getDb().securityFusionEntity.findMany({
+    where: {
+      type,
+      canonical: { in: entityInterpretations(type, canonicalEntity(type, value)) },
+    },
+    select: { id: true },
+    take: 100,
+  });
+  return rows.map((row) => row.id);
 }
 
 export function correlationFamily(
@@ -270,7 +306,10 @@ async function upsertEntity(
   eventId: string,
   observedAt: Date,
   ref: SecurityFusionEvent["entities"][number],
+  identity: AgentIdentity | null = null,
 ): Promise<string> {
+  if (ref.type === "agent")
+    return upsertAgentEntity(eventId, observedAt, ref, identity);
   const db = getDb();
   const aliases = entityInterpretations(
     ref.type,
@@ -356,9 +395,7 @@ async function correlate(
     new Set(related.map((item) => item.source)),
   );
   if (!family) return null;
-  const anchor = [...event.entities].sort((a, b) =>
-    `${a.type}:${a.value}`.localeCompare(`${b.type}:${b.value}`),
-  )[0];
+  const anchor = correlationAnchor(event.entities);
   const anchorAliases = anchor
     ? entityInterpretations(
         anchor.type,
@@ -675,8 +712,10 @@ export async function ingestSecurityFusionBatch(
     }
     if (!replay) stored += 1;
     const entityIds: string[] = [];
-    for (const ref of event.entities)
-      entityIds.push(await upsertEntity(row.id, row.observedAt, ref));
+    const identity = agentIdentityFromAttributes(event.attributes);
+    const derivedAgent = derivedMagnusAgentEntity(event);
+    for (const ref of derivedAgent ? [...event.entities, derivedAgent] : event.entities)
+      entityIds.push(await upsertEntity(row.id, row.observedAt, ref, identity));
     const caseId = uiSource(event.source)
       ? await correlateUiLogin(event, row.id, entityIds)
       : await correlate(event, row.id, entityIds);

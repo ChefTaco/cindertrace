@@ -144,7 +144,8 @@
                                   "ip",
                                   "service",
                                   "account",
-                                  "domain"
+                                  "domain",
+                                  "agent"
                                 ]
                               },
                               "value": {
@@ -3077,7 +3078,55 @@
             "bearerAuth": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "required": false,
+            "description": "Entity type; required together with entity.",
+            "schema": {
+              "$schema": "https://json-schema.org/draft/2020-12/schema",
+              "type": "string",
+              "enum": [
+                "user",
+                "host",
+                "device",
+                "ip",
+                "service",
+                "account",
+                "domain",
+                "agent"
+              ]
+            }
+          },
+          {
+            "name": "entity",
+            "in": "query",
+            "required": false,
+            "description": "Entity value, normalized like ingested entities. For agent: actor:<actorId>, agent-ref:<nodeId>~<profile> or magnus-node:<nodeId>. Required together with entityType.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Product-owned browser response",

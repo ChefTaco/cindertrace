@@ -44,6 +44,40 @@ Inventory uses `MAGNUS_INVENTORY_URL` and `MAGNUS_INVENTORY_TOKEN`. Set
 remain purpose-scoped; point Magnus's existing external-security configuration
 at Cindertrace.
 
+### Agent entities
+
+The `agent` entity type identifies an agent. Its canonical value is
+`actor:<actorId>`, where the actor ID is the HiveMem agent ID (`[a-z0-9_-]{2,32}`).
+Cindertrace also records two aliases on the entity: `agent-ref:<nodeId>~<profile>`
+(the Magnus node ID and Ardent profile ID) and `magnus-node:<nodeId>`. Agent
+values are matched exactly; unlike other entity types they are not lowercased.
+An event may name an agent directly with `{ "type": "agent", "value":
+"actor:<actorId>" }` or `"agent-ref:<nodeId>~<profile>"`. An agent reference with
+no known actor is kept as a provisional agent until an event binds that
+reference to an actor. Agent entities join cases but do not change how cases are
+grouped: a case is anchored on another entity whenever the event names one.
+
+For `magnus` events Cindertrace attaches the agent entity itself when the event
+attributes carry `actorId`, or `nodeId` with `profile` (or `agentRef`). Values are
+used exactly as sent and never derived. Magnus security export currently sends
+only `magnus.service.health` events with a `host` and a `service` entity and the
+attribute `nodeId`. Those events describe a node, not an agent, so no agent entity
+is attached. To link Magnus findings to an agent, Magnus would add to an event
+that concerns one agent the attributes `actorId` (its HiveMem agent ID) and
+`profile` (alongside the existing `nodeId`), or an `agent` entity with the value
+`actor:<actorId>`.
+
+`GET /api/v1/security-fusion/cases?entityType=<type>&entity=<value>` lists the
+cases linked to one entity, newest first, with the same response, limits,
+`status` and `archived` filters, and roles as the unfiltered list. Both
+parameters are required together. The value is normalized as on ingest. For
+`agent` it may be `actor:<actorId>`, which includes cases of provisional agents
+whose reference is now bound to that actor, `agent-ref:<nodeId>~<profile>`, or
+`magnus-node:<nodeId>` for every agent recorded on that node. An invalid filter
+returns 400 `INVALID_ENTITY_FILTER`; an unknown entity returns an empty list.
+
+### Response
+
 Response additionally requires the Magnus Cindertrace bridge, its additive
 migration, and a matching managed agent with the registered `/security-response`
 operation. Set Cindertrace's `MAGNUS_RESPONSE_URL` to the Magnus

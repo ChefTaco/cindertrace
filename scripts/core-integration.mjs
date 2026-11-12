@@ -181,6 +181,64 @@ try {
   assert.equal(new Set(uiCaseLinks.map((x) => x.caseId)).size, 1);
   const cases = (await (await req("/cases")).json()).data;
   assert(cases.length > 0);
+  // A Magnus event naming an agent links its case to the agent entity and its aliases.
+  const agentEvent = {
+    ...event,
+    source: "magnus",
+    eventId: "agent-" + randomUUID(),
+    sourceEventId: "agent-source-" + randomUUID(),
+    kind: "magnus.service.health",
+    summary: "Synthetic service failed on agent node",
+    entities: [
+      { type: "host", value: "agent-node.example.com" },
+      { type: "service", value: "example.service" },
+    ],
+    attributes: { nodeId: "node-fixture", profile: "Lead", actorId: "fixture-lead", serviceStatus: "failed" },
+  };
+  const agentRaw = JSON.stringify({ schemaVersion: "1.0", collectorId, sentAt: new Date().toISOString(), events: [agentEvent] });
+  const agentNonce = randomBytes(18).toString("base64url");
+  assert.equal(
+    (
+      await app.request("/api/v1/security-fusion/ingest/events", {
+        method: "POST",
+        headers: {
+          ...headers,
+          "x-security-nonce": agentNonce,
+          "x-security-signature": createHmac("sha256", secret)
+            .update(`${collectorId}.${timestamp}.${agentNonce}.${agentRaw}`)
+            .digest("hex"),
+        },
+        body: agentRaw,
+      })
+    ).status,
+    202,
+  );
+  const casesFor = async (type, value, bearer) =>
+    req(`/cases?entityType=${type}&entity=${encodeURIComponent(value)}`, "GET", undefined, bearer);
+  const agentCaseIds = [];
+  for (const value of ["actor:fixture-lead", "agent-ref:node-fixture~Lead", "magnus-node:node-fixture"]) {
+    const reply = await casesFor("agent", value);
+    assert.equal(reply.status, 200, value);
+    const rows = (await reply.json()).data;
+    assert.equal(rows.length, 1, value);
+    agentCaseIds.push(rows[0].id);
+  }
+  assert.equal(new Set(agentCaseIds).size, 1);
+  assert.deepEqual(
+    (await (await casesFor("host", "AGENT-NODE.example.com", operator)).json()).data.map((row) => row.id),
+    [agentCaseIds[0]],
+  );
+  assert.deepEqual((await (await casesFor("agent", "actor:fixture-missing")).json()).data, []);
+  assert.deepEqual((await (await casesFor("agent", "actor:fixture-lead")).json()).data[0].title.includes("agent-node.example.com"), true);
+  assert.equal((await casesFor("agent", "fixture-lead")).status, 400);
+  assert.equal((await req("/cases?entityType=agent", "GET")).status, 400);
+  assert.equal((await casesFor("agent", "actor:fixture-lead", viewer)).status, 403);
+  assert.deepEqual(
+    (await (await req("/cases?archived=true&entityType=agent&entity=actor%3Afixture-lead")).json()).data,
+    [],
+  );
+  assert.equal((await (await req("/cases?status=new&entityType=agent&entity=actor%3Afixture-lead")).json()).data.length, 1);
+  assert.deepEqual((await (await req("/cases?status=resolved&entityType=agent&entity=actor%3Afixture-lead")).json()).data, []);
   const detail = (await (await req("/cases/" + cases[0].id)).json()).data;
   assert.equal(detail.responseAvailable, false);
   assert.equal(
