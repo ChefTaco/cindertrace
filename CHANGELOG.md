@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- Add the Security Fusion sources `hivemem`, `hiveskills`, `ardentstudio` and `embermend`, and a collector that pulls HiveAuditRecord v1 from each product's `GET <api>/v1/audit/export?after=&limit=` with an Oathweave client-credentials token. Configure it with `SECURITY_COLLECTOR_AUDIT_SOURCES_JSON` (`[{source, url, audience, scope}]`), `SECURITY_COLLECTOR_AUDIT_OATHWEAVE_URL`, `SECURITY_COLLECTOR_AUDIT_CLIENT_ID` and `SECURITY_COLLECTOR_AUDIT_CLIENT_SECRET` or `_FILE`; each source may name its own client. Tokens are cached until shortly before expiry and refreshed once on 401. Sources poll independently and resume from their stored cursor checkpoint. Records map to `<product>.<action>` events whose severity follows the action (credential and permission changes high, deletes medium, reads info, failures one step higher), with `agent` entities from the record subject. See `docs/INTEGRATIONS.md`.
+- Add `hiveAuditRecordSchema` to the contracts.
+
+### Changed
+
+- `npm run init` admits the four new sources for the generated collector. Existing collector credentials must add them to `allowedSources` before the audit collector is configured.
+
+No database migration is required: sources are stored as text.
+
 ## [0.5.0] - 2026-11-12
 
 ### Added

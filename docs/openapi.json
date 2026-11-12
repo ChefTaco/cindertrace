@@ -90,7 +90,11 @@
                             "aegis_ui",
                             "security_console",
                             "cindertrace_ui",
-                            "mattermost"
+                            "mattermost",
+                            "hivemem",
+                            "hiveskills",
+                            "ardentstudio",
+                            "embermend"
                           ]
                         },
                         "sourceEventId": {
@@ -240,7 +244,11 @@
                         "aegis_ui",
                         "security_console",
                         "cindertrace_ui",
-                        "mattermost"
+                        "mattermost",
+                        "hivemem",
+                        "hiveskills",
+                        "ardentstudio",
+                        "embermend"
                       ]
                     },
                     "additionalProperties": {
@@ -358,7 +366,7 @@
                   },
                   "sources": {
                     "minItems": 1,
-                    "maxItems": 13,
+                    "maxItems": 17,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -378,7 +386,11 @@
                             "aegis_ui",
                             "security_console",
                             "cindertrace_ui",
-                            "mattermost"
+                            "mattermost",
+                            "hivemem",
+                            "hiveskills",
+                            "ardentstudio",
+                            "embermend"
                           ]
                         },
                         "status": {

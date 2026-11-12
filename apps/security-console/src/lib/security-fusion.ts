@@ -78,5 +78,12 @@ export function sourceLabel(source: string): string {
   if (["aegis_ui", "security_console", "cindertrace_ui"].includes(source)) return "Cindertrace console";
   if (["chattermost", "mattermost"].includes(source)) return "Mattermost-compatible audit";
   if (source === "magnus_ui") return "Magnus console";
+  const audit: Record<string, string> = {
+    hivemem: "HiveMem audit",
+    hiveskills: "HiveSkills audit",
+    ardentstudio: "ArdentStudio audit",
+    embermend: "Embermend audit",
+  };
+  if (audit[source]) return audit[source];
   return source.replaceAll("_", " ");
 }
