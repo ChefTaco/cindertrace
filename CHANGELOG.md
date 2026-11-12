@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Verify Oathweave resource tokens with the shared `@hivemagnus/hive-common` verifier and run its conformance vectors in the API tests. Cindertrace keeps its rules: user tokens only, exact `cindertrace` audience, required `clientId` and `roles` claims, no clock skew tolerance, an online session check on every use, and refusal responses unchanged (401). Identity links that name a `service:` or `system` account are now refused.
+- Add `GET /health/live` and `GET /health/ready`. `/health` and `/ready` are unchanged.
+- Read or generate a request ID (`x-request-id`, also `x-hive-request-id` and `x-correlation-id`) and W3C trace context for every API request, echo `x-request-id` on responses, and include it in API error log lines. Error response bodies are unchanged.
+
 ## [0.2.3] - 2026-11-11
 
 ### Security

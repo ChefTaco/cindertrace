@@ -1,31 +1,107 @@
-import { z } from 'zod';
 import { decodeProtectedHeader } from 'jose';
 import {
-  configuredOathweaveVerifier,
-  type OathweaveIdentity,
-} from './oathweave-verifier.js';
+  createOathweaveVerifier as createSharedOathweaveVerifier,
+  OathweaveError,
+  parseIdentityLinks,
+  requireIdentityLink,
+  type OathweaveVerifierOptions,
+} from '@hivemagnus/hive-common/oathweave';
 import type { AuthTokenPayload, UserRole } from '../types/index.js';
 
-const linkSchema = z
-  .object({
-    issuer: z.url(),
-    subject: z.string().min(1).max(256),
-    localUserId: z.string().min(1).max(256),
-    role: z.enum(['ADMIN', 'OPERATOR', 'VIEWER']),
-  })
-  .strict();
+export interface OathweaveOptions {
+  issuer: string;
+  jwksUrl: string;
+  userinfoUrl: string;
+  audience: string;
+}
+export interface OathweaveIdentity {
+  subject: string;
+  issuer: string;
+  sessionId: string;
+  roles: string[];
+  permissions: string[];
+  displayName: string;
+  authenticatedAt?: number;
+  expiresAt?: number;
+}
+export type OathweaveVerify = (token: string) => Promise<OathweaveIdentity>;
+
+/**
+ * Resource JWT validation plus online session revocation, through the shared suite verifier.
+ * Only user tokens are accepted. Failure is closed.
+ */
+export function createOathweaveVerifier(
+  options: OathweaveOptions,
+  overrides: Pick<OathweaveVerifierOptions, 'keys' | 'fetch' | 'now'> = {},
+): OathweaveVerify {
+  const verifier = createSharedOathweaveVerifier({
+    issuer: options.issuer,
+    audience: options.audience,
+    jwksUrl: options.jwksUrl,
+    userinfoUrl: options.userinfoUrl,
+    accept: 'user',
+    // Cindertrace has never tolerated clock skew on resource tokens.
+    clockToleranceSec: 0,
+    // Confirm the identity session online on every use, so revocation is immediate.
+    sessionCacheTtlMs: 0,
+    ...overrides,
+  });
+  return async (token) => {
+    const principal = await verifier.verifyUser(token);
+    // Cindertrace requires the Oathweave `clientId` and `roles` claims to be present.
+    if (
+      typeof principal.claims['clientId'] !== 'string' ||
+      !Array.isArray(principal.claims['roles'])
+    )
+      throw new OathweaveError('invalid_claims');
+    return {
+      subject: principal.subject,
+      issuer: principal.issuer,
+      sessionId: principal.sessionId,
+      expiresAt: principal.expiresAt,
+      permissions: [...principal.permissions],
+      roles: [...principal.roles],
+      displayName: principal.displayName,
+      ...(principal.authTime !== undefined
+        ? { authenticatedAt: principal.authTime * 1000 }
+        : {}),
+    };
+  };
+}
+
+let verifier: OathweaveVerify | undefined;
+export function configuredOathweaveVerifier(): OathweaveVerify | undefined {
+  if (
+    !process.env.OATHWEAVE_ISSUER &&
+    !process.env.OATHWEAVE_JWKS_URL &&
+    !process.env.OATHWEAVE_USERINFO_URL
+  )
+    return undefined;
+  if (!verifier) {
+    if (
+      !process.env.OATHWEAVE_ISSUER ||
+      !process.env.OATHWEAVE_JWKS_URL ||
+      !process.env.OATHWEAVE_USERINFO_URL
+    )
+      throw new Error('Oathweave configuration is incomplete');
+    verifier = createOathweaveVerifier({
+      issuer: process.env.OATHWEAVE_ISSUER,
+      jwksUrl: process.env.OATHWEAVE_JWKS_URL,
+      userinfoUrl: process.env.OATHWEAVE_USERINFO_URL,
+      audience: 'cindertrace',
+    });
+  }
+  return verifier;
+}
+
+const LINK_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER'] as const;
 export function linkedSecurityIdentity(
-  identity: OathweaveIdentity,
+  identity: Pick<OathweaveIdentity, 'issuer' | 'subject' | 'permissions'>,
   raw = process.env['CINDERTRACE_OATHWEAVE_IDENTITIES_JSON'] ?? '[]',
 ): AuthTokenPayload {
-  const links = z.array(linkSchema).max(10000).parse(JSON.parse(raw));
-  const matches = links.filter(
-    (link) =>
-      link.issuer === identity.issuer && link.subject === identity.subject,
-  );
-  if (matches.length !== 1)
-    throw new Error('An explicit unique product account link is required');
-  const link = matches[0]!;
+  // A duplicated link grants nothing to that identity; other links keep working.
+  const links = parseIdentityLinks(raw, { roles: LINK_ROLES, duplicates: 'ignore' });
+  const link = requireIdentityLink(links, identity);
   let role: UserRole;
   if (
     link.role === 'ADMIN' &&

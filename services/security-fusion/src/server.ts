@@ -13,8 +13,10 @@ import { renderMetrics } from "./routes/metrics.js";
 import type { AppVariables } from "./types/index.js";
 import { oathweaveBrowserRouter } from './browser-auth/oathweave-routes.js';
 import { browserAuthRouter } from './browser-auth/routes.js';
+import { registerHealthRoutes, requestContext } from "@hivemagnus/hive-common/hono";
 export const app = new Hono<AppVariables>();
 app.onError(errorHandler);
+app.use("*", requestContext());
 app.use("*", bodyLimitMiddleware(262144));
 app.use("*", async (c, next) => {
   await next();
@@ -35,6 +37,20 @@ app.get("/ready", async (c) => {
   const { redisReady } = await import("./middleware/rate-limit.js");
   await redisReady();
   return c.json({ success: true });
+});
+// Suite-standard probes. /health and /ready above keep their existing responses.
+registerHealthRoutes(app, {
+  service: "cindertrace-api",
+  checks: [
+    { name: "database", check: async () => { await getDb().$queryRaw`SELECT 1`; } },
+    {
+      name: "redis",
+      check: async () => {
+        const { redisReady } = await import("./middleware/rate-limit.js");
+        await redisReady();
+      },
+    },
+  ],
 });
 app.get("/metrics", async (c) => {
   if (

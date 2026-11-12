@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import type { ApiError } from "../types/index.js";
+import { getHiveContext } from "@hivemagnus/hive-common/hono";
 import { redactSecretText } from "../utils/redact.js";
 
 /** Global error handler for Hono — returns structured ApiError JSON. */
@@ -13,8 +14,9 @@ export function errorHandler(err: Error, c: Context): Response {
 
   // Log only the error message and code — never the full error object,
   // which may contain request bodies, tokens, or other secrets.
+  const requestId = getHiveContext(c)?.requestId;
   console.error(
-    `[ERROR] ${c.req.method} ${c.req.path} [${code}] ${err instanceof HttpError ? message : err.name}`,
+    `[ERROR] ${c.req.method} ${c.req.path} [${code}] ${err instanceof HttpError ? message : err.name}${requestId ? ` requestId=${requestId}` : ""}`,
   );
 
   const body: ApiError = {

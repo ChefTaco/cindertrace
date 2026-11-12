@@ -1,7 +1,7 @@
 import{beforeEach,expect,it,vi}from'vitest';
 import{generateKeyPair,SignJWT}from'jose';
 import{BrowserSessions,type SessionStore}from'./sessions.js';
-import{createOathweaveVerifier}from'../middleware/oathweave-verifier.js';
+import{createOathweaveVerifier}from'../middleware/oathweave.js';
 const issuer='https://identity.example.com',subject='synthetic-person',local='retained-local-admin';
 let active=true,permissions=['cindertrace:admin'],store:SessionStore,records:Map<string,string>,service:BrowserSessions,sign:(audience?:string)=>Promise<string>;
 let env:NodeJS.ProcessEnv;
@@ -13,7 +13,7 @@ beforeEach(async()=>{
  const verify=createOathweaveVerifier({issuer,jwksUrl:issuer+'/jwks',userinfoUrl:issuer+'/userinfo',audience:'cindertrace'},{keys:async()=>keys.publicKey,fetch:async()=>Response.json(active?{sub:subject,name:'Rehearsal operator'}:{error:'revoked'},{status:active?200:401})});service=new BrowserSessions(store,env,verify);
 });
 it('keeps resource bearer encrypted server-side and binds cookie identity to the explicit existing product account',async()=>{const resource=await sign(),issued=await service.createOathweave(resource),session=await service.verify(issued.token);expect(session).toMatchObject({userId:local,provider:'oathweave',role:'ADMIN',subject});expect([...records.values()].some(v=>v.includes(resource))).toBe(false);expect(issued.token).not.toContain(resource);expect(issued.ttl).toBeLessThanOrEqual(300);});
-it('rejects wrong-audience tokens before storing anything and never links by roles or matching names',async()=>{await expect(service.createOathweave(await sign('another-product'))).rejects.toThrow();expect(records.size).toBe(0);env.CINDERTRACE_OATHWEAVE_IDENTITIES_JSON='[]';await expect(service.createOathweave(await sign())).rejects.toThrow(/explicit unique/);expect(records.size).toBe(0)});
+it('rejects wrong-audience tokens before storing anything and never links by roles or matching names',async()=>{await expect(service.createOathweave(await sign('another-product'))).rejects.toThrow();expect(records.size).toBe(0);env.CINDERTRACE_OATHWEAVE_IDENTITIES_JSON='[]';await expect(service.createOathweave(await sign())).rejects.toMatchObject({reason:'not_linked'});expect(records.size).toBe(0)});
 it('revalidates live revocation and current explicit permissions on every use',async()=>{const issued=await service.createOathweave(await sign());active=false;expect(await service.verify(issued.token)).toBeNull();active=true;env.CINDERTRACE_OATHWEAVE_IDENTITIES_JSON='[]';expect(await service.verify(issued.token)).toBeNull();});
 it('revokes captured cookies durably during upstream outage and scopes revoke-all to the linked subject',async()=>{const a=await service.createOathweave(await sign()),b=await service.createOathweave(await sign());active=false;const logout=await service.verify(a.token,false);expect(logout).not.toBeNull();await service.revoke(logout!,true);active=true;expect(await service.verify(a.token)).toBeNull();expect(await service.verify(b.token)).toBeNull();});
 it('fails closed on tampered encrypted records or a forged product account claim',async()=>{const issued=await service.createOathweave(await sign());const key=[...records.keys()].find(k=>k.includes(':session:'))!;records.set(key,records.get(key)!.slice(0,-8)+'tampered');expect(await service.verify(issued.token)).toBeNull();});
