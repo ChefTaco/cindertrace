@@ -37,6 +37,30 @@ only `iam:audit:read router:security-events:read`. Configure
 `HIVE_IAM_SECURITY_CLIENT_SECRET`, and `HIVE_SECURITY_EXPORT_URL` (Router
 `/api/security/events`). Static Hive export tokens are retired.
 
+### HiveXUI inbox feed
+
+`GET /api/v1/hive/events?after=<cursor>&limit=<n>` serves HiveEvent v1 from
+`@hivemagnus/hive-common` for the HiveXUI inbox. The Hive Registry entry
+announces it as `"capabilities": {"events.v1": {"path": "/api/v1/hive/events"}}`.
+Events come from stored records only; nothing is written for the feed.
+
+| Type | Source | Severity |
+|---|---|---|
+| `case.opened`, `case.reopened`, `case.severity.raised` | case activity | case severity: info and low → `info`, medium and high → `warning`, critical → `critical` |
+| `case.closed` | case update to resolved or false positive | `info` |
+| `containment.approval.requested` | containment approval request | `warning` |
+| `containment.approval.approved`, `containment.approval.rejected` | console or external decision | `info` |
+| `containment.action.succeeded`, `containment.action.released`, `containment.release.requested` | dispatch results, release request | `info` |
+| `containment.action.failed`, `containment.action.unknown` | dispatch or verification results | `critical` |
+
+Every event links to `/security-fusion/cases/<caseId>`. When a case has one
+agent entity, `subject` carries its `actorId`, `agentRef` and `nodeId`;
+containment events name the target node. Pages are oldest first by
+`(occurredAt, id)`, hold events strictly after `after`, default to 50 and allow
+up to 200, and cover the last 14 days. Access matches case reads: ADMIN and
+OPERATOR sessions, 401 without one, 403 for VIEWER and for endpoint-scoped
+service credentials.
+
 ## Magnus
 
 Inventory uses `MAGNUS_INVENTORY_URL` and `MAGNUS_INVENTORY_TOKEN`. Set

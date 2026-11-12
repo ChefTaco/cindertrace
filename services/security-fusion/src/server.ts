@@ -5,6 +5,7 @@ import { authLimitsRelaxed } from "./config/auth-limits.js";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { securityFusionRouter } from "./routes/security-fusion.js";
+import { hiveEventsRouter } from "./routes/hive-events.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { bodyLimitMiddleware } from "./middleware/body-limit.js";
 import { tokenMatches } from "./middleware/auth.js";
@@ -148,3 +149,6 @@ app.use(
   rateLimitMiddleware({ max: 120, failClosed: true }),
 );
 app.route("/api/v1/security-fusion", securityFusionRouter);
+// HiveEvent v1 feed for the HiveXUI inbox; same auth and role rules as case reads.
+app.use("/api/v1/hive/*", rateLimitMiddleware({ max: 120, failClosed: true, keyPrefix: "rl-hive" }));
+app.route("/api/v1/hive", hiveEventsRouter);
