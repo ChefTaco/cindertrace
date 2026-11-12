@@ -35,6 +35,7 @@ test('bundled JWT/JWKS runtime preserves signature and claim checks with no priv
     await assert.rejects(runtime.jwtVerify(signed, key, {...options, issuer: 'wrong-fixture-issuer'}));
     await assert.rejects(runtime.jwtVerify(signed, key, {...options, audience: 'wrong-fixture-api'}));
     await assert.rejects(runtime.jwtVerify(signed, key, {...options, algorithms: ['HS512']}));
+    await assert.rejects(runtime.jwtVerify(signed, crypto.getRandomValues(new Uint8Array(32)), options), runtime.errors.JWSSignatureVerificationFailed);
     const expired = await new runtime.SignJWT({}).setProtectedHeader({alg: 'HS256'}).setExpirationTime(Math.floor(Date.now() / 1000) - 1).sign(key);
     await assert.rejects(runtime.jwtVerify(expired, key, {algorithms: ['HS256']}));
     const keys = await crypto.subtle.generateKey({name: 'Ed25519'}, true, ['sign', 'verify']);
@@ -47,6 +48,9 @@ test('bundled JWT/JWKS runtime preserves signature and claim checks with no priv
     const external = await new runtime.SignJWT({}).setProtectedHeader({alg: 'EdDSA', kid: jwk.kid}).setIssuer('fixture-idp').setAudience('fixture-api').setExpirationTime('60s').sign(keys.privateKey);
     assert.equal((await runtime.jwtVerify(external, jwks, {issuer: 'fixture-idp', audience: 'fixture-api', algorithms: ['EdDSA']})).payload.iss, 'fixture-idp');
     assert.equal(runtime.decodeProtectedHeader(external).kid,jwk.kid);
+    assert.equal((await runtime.jwtVerify(external, runtime.createLocalJWKSet({keys: [jwk]}), {algorithms: ['EdDSA']})).payload.iss, 'fixture-idp');
+    const otherKid = await new runtime.SignJWT({}).setProtectedHeader({alg: 'EdDSA', kid: 'other-fixture-key'}).sign(keys.privateKey);
+    await assert.rejects(runtime.jwtVerify(otherKid, runtime.createLocalJWKSet({keys: [jwk]})), runtime.errors.JWKSNoMatchingKey);
     let verifiedFetches=0;
     const verifiedKeys=runtime.createRemoteJWKSet(new URL('https://identity.example.com/jwks'),{[runtime.customFetch]:async()=>{verifiedFetches++;return Response.json({keys:[jwk]});}});
     assert.equal((await runtime.jwtVerify(external,verifiedKeys,{issuer:'fixture-idp',audience:'fixture-api',algorithms:['EdDSA']})).payload.iss,'fixture-idp');

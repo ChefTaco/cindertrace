@@ -56,4 +56,18 @@ describe('explicit Oathweave security account links', () => {
       linkedSecurityIdentity(identity, JSON.stringify([link, link])),
     ).toThrow();
   });
+  it('limits a duplicated link to the duplicated identity', () => {
+    const other = { ...link, subject: 'other-subject' };
+    expect(
+      linkedSecurityIdentity(identity, JSON.stringify([link, other, other])),
+    ).toMatchObject({ userId: 'existing-user-id' });
+  });
+  it('refuses links that name a service actor', () => {
+    expect(() =>
+      linkedSecurityIdentity(
+        identity,
+        JSON.stringify([{ ...link, localUserId: 'service:security-plugin:draft' }]),
+      ),
+    ).toThrow();
+  });
 });

@@ -2,8 +2,7 @@ import { createHmac, randomUUID, randomBytes, createCipheriv, createDecipheriv, 
 import { Redis } from "ioredis";
 import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
-import { configuredOathweaveVerifier, type OathweaveIdentity } from "../middleware/oathweave-verifier.js";
-import { linkedSecurityIdentity } from "../middleware/oathweave.js";
+import { configuredOathweaveVerifier, linkedSecurityIdentity, type OathweaveIdentity } from "../middleware/oathweave.js";
 import { credentials } from "./credentials.js";
 
 export const COOKIE_NAME = "cindertrace_session",

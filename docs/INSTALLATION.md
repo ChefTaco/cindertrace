@@ -5,8 +5,9 @@
 overwrite an existing environment. Configuration and state are local-only.
 
 Compose runs the console, API, PostgreSQL, and Redis. The collector is an opt-in
-profile. The API exposes `/health`, `/ready` (database and Redis), and authenticated
-`/metrics`. Only the console is published to the host, bound to loopback.
+profile. The API exposes `/health`, `/ready` (database and Redis), the suite-standard
+`/health/live` and `/health/ready` (per-dependency JSON, 503 when not ready), and
+authenticated `/metrics`. Every response carries an `x-request-id`. Only the console is published to the host, bound to loopback.
 
 For a remote installation, replace the TLS certificate/key, configure
 `DASHBOARD_PUBLIC_ORIGIN`, and explicitly publish the console on your chosen
