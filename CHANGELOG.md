@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.3.0] - 2026-11-12
+
 ### Changed
 
 - Verify Oathweave resource tokens with the shared `@hivemagnus/hive-common` verifier and run its conformance vectors in the API tests. Cindertrace keeps its rules: user tokens only, exact `cindertrace` audience, required `clientId` and `roles` claims, no clock skew tolerance, an online session check on every use, and refusal responses unchanged (401). Identity links that name a `service:` or `system` account are now refused.
