@@ -7,10 +7,31 @@ import {
   securityFusionSourceReportSchema,
   securityFusionInvestigationDraftSchema,
   securityFusionContainmentPreviewSchema,
+  securityFusionEntityTypeSchema,
 } from "@cindertrace/contracts";
 import { securityFusionRouter } from "./routes/security-fusion.js";
 import { adminDecisionSchema } from "./services/approval-decisions.js";
 import { sentiApprovalAssertionSchema } from "./security/senti-approval.js";
+const caseListQuery = [
+  { name: "status", in: "query", required: false, schema: { type: "string" } },
+  { name: "archived", in: "query", required: false, schema: { type: "boolean" } },
+  {
+    name: "entityType",
+    in: "query",
+    required: false,
+    description: "Entity type; required together with entity.",
+    schema: z.toJSONSchema(securityFusionEntityTypeSchema),
+  },
+  {
+    name: "entity",
+    in: "query",
+    required: false,
+    description:
+      "Entity value, normalized like ingested entities. For agent: actor:<actorId>, agent-ref:<nodeId>~<profile> or magnus-node:<nodeId>. Required together with entityType.",
+    schema: { type: "string", minLength: 1, maxLength: 512 },
+  },
+];
+
 export function buildOpenApiSpec() {
   const paths: Record<string, Record<string, unknown>> = {};
   for (const route of securityFusionRouter.routes) {
@@ -51,12 +72,15 @@ export function buildOpenApiSpec() {
             },
           }
         : {}),
-      parameters: [...path.matchAll(/\{([^}]+)\}/g)].map((match) => ({
-        name: match[1],
-        in: "path",
-        required: true,
-        schema: { type: "string" },
-      })),
+      parameters: [
+        ...[...path.matchAll(/\{([^}]+)\}/g)].map((match) => ({
+          name: match[1],
+          in: "path",
+          required: true,
+          schema: { type: "string" },
+        })),
+        ...(method === "get" && route.path === "/cases" ? caseListQuery : []),
+      ],
       responses: {
         200: { description: "Successful response" },
         202: { description: "Accepted signed observations" },

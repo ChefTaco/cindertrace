@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Add the `agent` entity type. Its canonical value is `actor:<actorId>` (HiveMem agent ID), with `agent-ref:<nodeId>~<profile>` and `magnus-node:<nodeId>` recorded as aliases. Agent entities join cases without changing how existing cases are grouped.
+- Add `entityType` and `entity` query parameters to `GET /api/v1/security-fusion/cases` to list the cases linked to one entity. The unfiltered response, limits and roles are unchanged; an invalid filter returns 400 `INVALID_ENTITY_FILTER`.
+- Attach an `agent` entity to `magnus` events whose attributes carry `actorId`, or `nodeId` with `profile`. Current Magnus service health events carry only `nodeId`, so they gain no agent entity; `docs/INTEGRATIONS.md` describes what Magnus would need to send.
+
+No database migration is required: entity types are stored as text and the filter uses the existing case entity index.
+
 ## [0.3.0] - 2026-11-12
 
 ### Changed
