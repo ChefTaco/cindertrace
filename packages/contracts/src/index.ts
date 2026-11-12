@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { labAssessmentSchema } from './lab.js';
 export * from './lab.js';
+export * from './hive-audit.js';
 
 export const securityFusionSourceSchema = z.enum([
   'unifi_dns',
@@ -16,6 +17,10 @@ export const securityFusionSourceSchema = z.enum([
   'security_console',
   'cindertrace_ui',
   'mattermost',
+  'hivemem',
+  'hiveskills',
+  'ardentstudio',
+  'embermend',
 ]);
 export const securityFusionSeveritySchema = z.enum(['info', 'low', 'medium', 'high', 'critical']);
 export const securityFusionEntityTypeSchema = z.enum(['user', 'host', 'device', 'ip', 'service', 'account', 'domain', 'agent']);

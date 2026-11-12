@@ -54,6 +54,10 @@ const sourceTrust: Record<string, number> = {
   mattermost: 0.86,
   hive: 0.9,
   chattermost: 0.86,
+  hivemem: 0.9,
+  hiveskills: 0.9,
+  ardentstudio: 0.9,
+  embermend: 0.9,
 };
 
 const MAGNUS_SOURCE_STATE_TOUCH_INTERVAL_MS = 60_000;

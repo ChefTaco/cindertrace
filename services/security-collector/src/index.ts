@@ -45,8 +45,14 @@ import {
   checkpointedPoll,
 } from "./runtime-security.js";
 import { fetchCompleteLokiWindow } from "./loki-query.js";
+import {
+  OathweaveTokenCache,
+  pollAuditSource,
+  readAuditExportConfig,
+} from "./audit-export.js";
 
 const runtimeConfig = readSecurityCollectorRuntimeConfig();
+const auditSources = readAuditExportConfig();
 const controlUrl = (
   process.env["CINDERTRACE_API_URL"] ??
   process.env["CONTROL_API_URL"] ??
@@ -132,6 +138,8 @@ function request(input: string | URL, init: RequestInit = {}) {
     maxResponseBytes: runtimeConfig.maxResponseBytes,
   });
 }
+
+const auditTokens = new OathweaveTokenCache(request);
 
 function signedHeaders(raw: string): Record<string, string> {
   const timestamp = new Date().toISOString();
@@ -637,6 +645,8 @@ setSourceStatus(
     ? "configured"
     : "unconfigured",
 );
+for (const { source } of auditSources ?? [])
+  setSourceStatus(source, "configured");
 setSourceStatus(
   "chattermost",
   process.env["CHATTERMOST_SECURITY_EXPORT_URL"]
@@ -695,6 +705,20 @@ async function pollSources(): Promise<void> {
       ),
     );
   }
+  // Each product polls independently; one failing source never holds the others.
+  for (const config of auditSources ?? [])
+    work.push(
+      runPoll(`${config.source} audit export poll failed`, [config.source], () =>
+        pollAuditSource({
+          config,
+          tokens: auditTokens,
+          cursor: cursors.get(config.source),
+          setCursor: (cursor) => cursors.set(config.source, cursor),
+          request,
+          enqueue,
+        }),
+      ),
+    );
   await Promise.all(work);
   await reportSourceStatus().catch((error: unknown) => {
     console.error(

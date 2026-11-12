@@ -24,6 +24,72 @@ The wire source aliases `aegis_ui`, `security_console`, and `cindertrace_ui`, an
 `chattermost`/`mattermost`, remain readable. Original event IDs, source names,
 checksums, and signed payloads are never rewritten for branding.
 
+## Suite product audit
+
+The collector pulls HiveAuditRecord v1 from HiveMem, HiveSkills, ArdentStudio and
+Embermend through each product's `GET <api>/v1/audit/export?after=<cursor>&limit=200`
+and ingests it under the sources `hivemem`, `hiveskills`, `ardentstudio` and
+`embermend`. Add those sources to the collector's `allowedSources` in
+`SECURITY_FUSION_COLLECTOR_CREDENTIALS_JSON`; a configured source outside the
+collector's admission stops polling at startup.
+
+Configure the products with `SECURITY_COLLECTOR_AUDIT_SOURCES_JSON`, a JSON list:
+
+```json
+[
+  {"source": "hivemem", "url": "https://hivemem.internal.example/v1/audit/export", "audience": "hivemem"},
+  {"source": "embermend", "url": "https://embermend.internal.example/api/v1/audit/export", "audience": "embermend", "scope": "embermend:audit:read"}
+]
+```
+
+`url` is the product's internal HTTPS export URL. `scope` defaults to
+`<source>:audit:read`, the permission each product checks. Tokens come from
+Oathweave client credentials at `<SECURITY_COLLECTOR_AUDIT_OATHWEAVE_URL>/api/v1/oauth/token`
+with `SECURITY_COLLECTOR_AUDIT_CLIENT_ID` and either
+`SECURITY_COLLECTOR_AUDIT_CLIENT_SECRET` or `SECURITY_COLLECTOR_AUDIT_CLIENT_SECRET_FILE`.
+An Oathweave machine client issues tokens for one audience, so a source may name
+its own `clientId` and `clientSecretFile`; register each client with the
+product's audience and its `<product>:audit:read` permission. When the token is a
+JWT, the collector refuses one whose `aud` does not include the configured
+`audience`. Tokens are cached until shortly before they expire (a fifth of the
+lifetime, at most a minute early) and are refreshed once when a product answers 401.
+
+Every source polls independently each minute, so a failing product is reported in
+its own source status and never holds the others. A poll reads up to 25 pages
+strictly after the source's checkpoint. Each page is validated as a whole before
+any of it is queued; a malformed record, a record naming another product or a
+full queue holds the checkpoint. The checkpoint advances to each page's
+`nextCursor` and is stored by the API with the ingested events, so a restarted
+collector resumes after it. A page with records carries its last record's
+cursor; an empty page with `nextCursor: null` means caught up, and the next poll
+asks again after the last stored cursor. Event IDs (`sha256(<source>:<record id>)`)
+deduplicate any replay, and a record repeated within a page is queued once. Collector logs name the
+source, status and invalid field paths only, never record contents.
+
+Each record becomes one event: `kind` is `<product>.<action>`, `observedAt` is
+`occurredAt`, `sourceEventId` and the evidence locator are the record `id`, and
+the attributes keep `product`, `action`, `outcome`, `actor`, `target` and the
+product's redacted `details`. A `user` actor becomes a `user` entity, a `service`
+actor a `service` entity, and an `agent` actor whose ID is a HiveMem agent ID an
+`agent` entity. The record's `subject` names the agent the action concerns:
+`subject.actorId` attaches `actor:<actorId>`, otherwise `subject.agentRef` attaches
+`agent-ref:<nodeId>~<profile>`. Valid `subject` values are also set as the
+`actorId`, `agentRef` and `nodeId` attributes, so the agent gains its
+`agent-ref:` and `magnus-node:` aliases as described under Agent entities.
+Malformed subject IDs are ignored.
+
+Severity comes from the action's dotted and underscored terms, then the outcome:
+
+| Action terms | Severity |
+|---|---|
+| credential, secret, token, key, api_key, password, passkey, mfa, totp, certificate; permission, role, grant, acl, policy, scope, access, share, member, membership, privilege, admin, owner | `high` |
+| delete, remove, purge, destroy, erase, wipe, revoke, forget, unshare | `medium` |
+| read, list, get, view, search, query, fetch, download, export, recall, lookup, login, signin | `info` |
+| anything else (create, update, promote, publish, ...) | `low` |
+
+A `failure` outcome raises the severity one step, to at least `medium`; a failed
+credential or permission change is `critical`.
+
 ## Hive
 
 Hive login uses the configured discovery URL, client ID, issuer, API audience,

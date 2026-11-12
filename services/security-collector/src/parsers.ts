@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { SecurityFusionEvent, SecurityFusionSource } from '@cindertrace/contracts';
 
-function eventId(source: string, sourceId: string): string {
+export function eventId(source: string, sourceId: string): string {
   return createHash('sha256').update(`${source}:${sourceId}`).digest('hex');
 }
 
