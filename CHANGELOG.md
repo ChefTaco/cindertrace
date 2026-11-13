@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- The collector no longer retries a refused batch forever. The ingest API refuses a whole batch when one event breaks the event schema, is larger than 32,768 bytes or is nested deeper than 8 levels, and the collector put the refused batch back at the front of its queue, so one such event (for example a CEF datagram with an empty name, or an export row with a `kind` longer than 160 characters) stopped all later events and checkpoints. The collector now checks each event against the same limits before queueing it, drops one that can never be accepted, and logs the source and the failing field names, never the content.
+- Deleting an archived case after its grace period now also deletes the case's assurance packets, which were left behind. The case deletion receipt counts them in `childCounts.assurancePackets`.
+- A signed ingest request that fails because nonce storage is unavailable is answered 500 `INTERNAL_ERROR`. It was answered 409 `INGEST_REPLAY`, which is now kept for a nonce that has been used.
+- An ingest nonce is kept until its signed timestamp can no longer pass the five minute skew check. A request stamped ahead of the API clock could outlive its nonce record by up to five minutes.
+- `PATCH /api/v1/security-fusion/cases/:id` validates its body. A body that is not JSON, an `assignedTo` that is not a string or null, and an unknown `status` are answered 400 `VALIDATION_ERROR`; an unknown case is answered 404 `NOT_FOUND`. These were 500s, apart from the unknown status. Only `status` and `assignedTo` are recorded in case activity; the whole request body was recorded before.
+- A request body that is not JSON is answered 400 `VALIDATION_ERROR` instead of 500 on the assurance, investigation, action preview and approval decision routes.
+- `GET /api/v1/security-fusion/events?limit=` uses the default of 100 when `limit` is not a number, instead of answering 500.
+- Stored event attributes and audit details redact sensitive keys whatever their letter case (`AccessToken`, `APIKEY`, `PrivateKey` and similar were kept), and keep nested arrays as arrays instead of turning them into objects.
+
+No database migration is required.
+
 ## [0.6.1] - 2026-11-13
 
 ### Fixed
