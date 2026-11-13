@@ -300,6 +300,18 @@ securityFusionRouter.post("/ingest/events", async (c) => {
       );
     }
     const result = await ingestSecurityFusionBatch(parsed.data);
+    if (result.rejected.length > 0)
+      console.warn(
+        "[WARN] POST /api/v1/security-fusion/ingest/events rejected events",
+        JSON.stringify(
+          result.rejected.map((item) => ({
+            index: item.index,
+            code: item.code,
+            source: parsed.data.events[item.index]?.source,
+            kind: parsed.data.events[item.index]?.kind,
+          })),
+        ),
+      );
     await getDb().securityFusionCollector.update({
       where: { id: credential.collectorId },
       data: { lastSuccessAt: new Date(), lastErrorAt: null, lastError: null },

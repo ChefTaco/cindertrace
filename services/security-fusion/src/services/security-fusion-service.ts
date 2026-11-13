@@ -18,6 +18,10 @@ import type {
 import { getDb } from "../db/index.js";
 import { HttpError } from "../middleware/error-handler.js";
 import { incMetric } from "../routes/metrics.js";
+import {
+  observedAtRejection,
+  type RejectedSecurityFusionEvent,
+} from "./security-fusion-ingest.js";
 import { sanitizeDetails } from "./audit-service.js";
 import {
   appendDeletionReceipts,
@@ -624,7 +628,13 @@ async function correlateUiLogin(
 
 export async function ingestSecurityFusionBatch(
   batch: SecurityFusionEventBatch,
-): Promise<{ stored: number; duplicates: number; caseIds: string[] }> {
+  receivedAt: Date = new Date(),
+): Promise<{
+  stored: number;
+  duplicates: number;
+  rejected: RejectedSecurityFusionEvent[];
+  caseIds: string[];
+}> {
   const db = getDb();
   const definition = canonicalJson({
     families: [
@@ -668,8 +678,15 @@ export async function ingestSecurityFusionBatch(
   });
   let stored = 0;
   let duplicates = 0;
+  const rejected: RejectedSecurityFusionEvent[] = [];
   const caseIds = new Set<string>();
-  for (const event of batch.events) {
+  for (const [index, event] of batch.events.entries()) {
+    const rejection = observedAtRejection(event, index, receivedAt);
+    if (rejection) {
+      rejected.push(rejection);
+      incMetric("ingestEventsRejected");
+      continue;
+    }
     const sanitized = {
       ...event,
       attributes: sanitizeDetails(event.attributes),
@@ -748,7 +765,7 @@ export async function ingestSecurityFusionBatch(
       update: { checkpoint },
     });
   }
-  return { stored, duplicates, caseIds: [...caseIds] };
+  return { stored, duplicates, rejected, caseIds: [...caseIds] };
 }
 
 export function isSecurityRelevantServiceStatus(

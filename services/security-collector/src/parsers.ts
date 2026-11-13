@@ -289,6 +289,14 @@ export function aggregateUnifiLokiEvents(events: SecurityFusionEvent[]): Securit
   });
 }
 
+// Upstream zero times (Go `0001-01-01T00:00:00Z`, e.g. Tailscale `LastSeen` for a
+// peer that is online now) and the Unix epoch mean "unknown"; use receive time.
+const earliestPlausibleTime = Date.parse('2000-01-01T00:00:00.000Z');
+export function plausibleTime(value: string, now = new Date()): string {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && parsed >= earliestPlausibleTime ? new Date(parsed).toISOString() : now.toISOString();
+}
+
 export function externalEvent(source: 'tailscale' | 'hive' | 'chattermost', row: Record<string, unknown>): SecurityFusionEvent {
   const sourceId = String(row['id'] ?? row['eventId'] ?? row['requestId'] ?? randomUUID());
   const timestamp = String(row['timestamp'] ?? row['createdAt'] ?? row['logged'] ?? new Date().toISOString());
@@ -298,7 +306,7 @@ export function externalEvent(source: 'tailscale' | 'hive' | 'chattermost', row:
   return {
     schemaVersion: '1.0', eventId: eventId(source, sourceId), source, sourceEventId: sourceId,
     kind: String(row['eventType'] ?? row['action'] ?? row['kind'] ?? `${source}.event`),
-    observedAt: Number.isFinite(Date.parse(timestamp)) ? new Date(timestamp).toISOString() : new Date().toISOString(),
+    observedAt: plausibleTime(timestamp),
     severity: severity(row['severity'] as string | number | undefined),
     confidence: source === 'tailscale' ? 0.9 : source === 'hive' ? 0.9 : 0.86,
     summary: String(row['summary'] ?? row['title'] ?? row['action'] ?? `${source} security event`).slice(0, 2000),
