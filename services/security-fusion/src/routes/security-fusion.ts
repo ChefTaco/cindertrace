@@ -4,7 +4,9 @@ import { responseConfigured } from "../config/runtime.js";
 import { validateActionTarget } from "../services/targets.js";
 import { createHmac, randomBytes } from "node:crypto";
 import { Hono, type Context } from "hono";
+import { z } from "zod";
 import {
+  securityFusionCaseStatusSchema,
   securityFusionCaseEntityFilterSchema,
   securityFusionContainmentPreviewSchema,
   securityFusionEventBatchSchema,
@@ -100,6 +102,36 @@ function json(value: string): unknown {
     return {};
   }
 }
+
+/** Request JSON, or a 400 for a body that is not JSON. */
+async function jsonBody(c: Context<AppVariables>): Promise<unknown> {
+  try {
+    return await c.req.json();
+  } catch {
+    throw new HttpError(400, "VALIDATION_ERROR", "Invalid JSON body");
+  }
+}
+
+/** A whole-number query value within bounds; anything else is the fallback. */
+export function boundedQueryInteger(
+  raw: string | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const value = raw === undefined || raw.trim() === "" ? fallback : Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(Math.max(Math.trunc(value), minimum), maximum);
+}
+
+const casePatchSchema = z.object({
+  // An empty or null status has always meant "leave the status unchanged".
+  status: z.preprocess(
+    (value) => (value === null || value === "" ? undefined : value),
+    securityFusionCaseStatusSchema.optional(),
+  ),
+  assignedTo: z.string().max(256).nullable().optional(),
+});
 
 function serializeCase(row: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -240,12 +272,16 @@ async function verifyIngest(
         data: {
           nonce,
           collectorId,
-          expiresAt: new Date(Date.now() + INGEST_SKEW_MS),
+          // Keep the nonce until its signed timestamp can no longer pass the skew check.
+          expiresAt: new Date(
+            Math.max(Date.now(), timestampMs) + INGEST_SKEW_MS,
+          ),
         },
       });
     });
   } catch (error) {
-    if (error instanceof HttpError) throw error;
+    // Only a duplicate nonce is a replay; a storage failure stays a server error.
+    if ((error as { code?: unknown } | null)?.code !== "P2002") throw error;
     throw new HttpError(
       409,
       "INGEST_REPLAY",
@@ -556,7 +592,7 @@ securityFusionRouter.post(
 securityFusionRouter.get("/events", async (c) => {
   const source = c.req.query("source");
   const kind = c.req.query("kind");
-  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 100), 1), 250);
+  const limit = boundedQueryInteger(c.req.query("limit"), 100, 1, 250);
   const rows = await getDb().securityFusionEvent.findMany({
     where: {
       ...(source ? { source } : {}),
@@ -852,21 +888,17 @@ securityFusionRouter.patch(
   "/cases/:id",
   requireRole("ADMIN", "OPERATOR"),
   async (c) => {
-    const body = (await c.req.json()) as {
-      status?: string;
-      assignedTo?: string | null;
-    };
-    const allowed = [
-      "new",
-      "triage",
-      "investigating",
-      "contained",
-      "monitoring",
-      "resolved",
-      "false_positive",
-    ];
-    if (body.status && !allowed.includes(body.status))
-      throw new HttpError(400, "VALIDATION_ERROR", "Invalid case status");
+    const parsed = casePatchSchema.safeParse(await jsonBody(c));
+    if (!parsed.success)
+      throw new HttpError(
+        400,
+        "VALIDATION_ERROR",
+        parsed.error.issues.some((issue) => issue.path[0] === "status")
+          ? "Invalid case status"
+          : "Invalid case update",
+      );
+    // Only the validated fields are applied and recorded in case activity.
+    const body = parsed.data;
     const user = getUser(c);
     if (body.status === "resolved") {
       const row = await resolveCaseWithVerifiedClosure(
@@ -874,22 +906,26 @@ securityFusionRouter.patch(
       );
       return c.json({ success: true, data: serializeCase(row as unknown as Record<string, unknown>) });
     }
-    const row = await getDb().securityFusionCase.update({
-      where: { id: c.req.param("id") },
-      data: {
-        ...(body.status
-          ? {
-              status: body.status,
-              resolvedAt: ["resolved", "false_positive"].includes(body.status)
-                ? new Date()
-                : null,
-            }
-          : {}),
-        ...(body.assignedTo !== undefined
-          ? { assignedTo: body.assignedTo }
-          : {}),
-      },
-    });
+    const row = await getDb()
+      .securityFusionCase.update({
+        where: { id: c.req.param("id") },
+        data: {
+          ...(body.status
+            ? {
+                status: body.status,
+                resolvedAt: body.status === "false_positive" ? new Date() : null,
+              }
+            : {}),
+          ...(body.assignedTo !== undefined
+            ? { assignedTo: body.assignedTo }
+            : {}),
+        },
+      })
+      .catch((error: unknown) => {
+        if ((error as { code?: unknown } | null)?.code === "P2025")
+          throw new HttpError(404, "NOT_FOUND", "Security case not found");
+        throw error;
+      });
     await getDb().securityFusionCaseActivity.create({
       data: {
         caseId: row.id,
@@ -906,7 +942,7 @@ securityFusionRouter.patch(
 );
 
 securityFusionRouter.post('/cases/:id/assurance/exposure/preview', bodyLimitMiddleware(65_536), async (c) => c.json({
-  success: true, data: await previewExposureAssessment(c.req.param('id')!, await c.req.json()),
+  success: true, data: await previewExposureAssessment(c.req.param('id')!, await jsonBody(c)),
 }));
 
 for (const [path, create] of [
@@ -919,7 +955,7 @@ for (const [path, create] of [
     `/cases/:id/assurance/${path}`,
     requireRole("ADMIN", "OPERATOR"),
     async (c) => c.json({ success: true, data: await create(
-      c.req.param("id")!, getUser(c).userId, await c.req.json(),
+      c.req.param("id")!, getUser(c).userId, await jsonBody(c),
     ) }, 201),
   );
 }
@@ -929,7 +965,7 @@ securityFusionRouter.post(
   requireRole("ADMIN", "OPERATOR"),
   async (c) => {
     const parsed = securityFusionInvestigationDraftSchema.safeParse(
-      await c.req.json(),
+      await jsonBody(c),
     );
     if (!parsed.success)
       throw new HttpError(
@@ -1058,7 +1094,7 @@ securityFusionRouter.get("/approval-plans/:id", async (c) => {
 
 securityFusionRouter.post("/approval-decisions", async (c) => {
   requireSentiBridge(c);
-  const result = await recordContainmentApproval(await c.req.json());
+  const result = await recordContainmentApproval(await jsonBody(c));
   if (result.outbox_id) void dispatchSecurityFusionOutbox().catch(() => undefined);
   await logAuditEvent({
     action: `security_fusion.action.external_${result.decision}`,
@@ -1079,7 +1115,7 @@ securityFusionRouter.post(
   async (c) => {
     if (!responseConfigured()) throw new HttpError(503, "RESPONSE_UNCONFIGURED", "Magnus response is not configured");
     const parsed = securityFusionContainmentPreviewSchema.safeParse({
-      ...(await c.req.json()),
+      ...((await jsonBody(c)) as object | null),
       caseId: c.req.param("id"),
     });
     if (!parsed.success)

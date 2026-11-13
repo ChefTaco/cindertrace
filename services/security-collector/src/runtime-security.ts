@@ -1,4 +1,7 @@
-import type { SecurityFusionEvent } from "@cindertrace/contracts";
+import {
+  securityFusionEventSchema,
+  type SecurityFusionEvent,
+} from "@cindertrace/contracts";
 
 const DEFAULT_HTTP_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 1_048_576;
@@ -136,6 +139,42 @@ export function readSecurityCollectorRuntimeConfig(
       100_000,
     ),
   };
+}
+
+/** Per-event limits the ingest API enforces. One event outside them fails its whole batch. */
+export const INGEST_MAX_EVENT_BYTES = 32_768;
+export const INGEST_MAX_NESTING_DEPTH = 8;
+/** Room for the `observationCount` attribute the queue adds to a repeated event. */
+const EVENT_BYTE_HEADROOM = 64;
+
+function nestingExceeds(value: unknown, depth: number): boolean {
+  if (depth > INGEST_MAX_NESTING_DEPTH) return true;
+  if (value === null || typeof value !== "object") return false;
+  return Object.values(value).some((item) => nestingExceeds(item, depth + 1));
+}
+
+/**
+ * Why the ingest API would refuse this event, or null when it is admissible.
+ * The API answers such an event by refusing the batch that carries it, and a
+ * refused batch is retried, so one such event would block every later event.
+ * The reason names fields and limits only, never event content.
+ */
+export function ingestRejection(event: SecurityFusionEvent): string | null {
+  const parsed = securityFusionEventSchema.safeParse(event);
+  if (!parsed.success)
+    return `invalid ${[
+      ...new Set(
+        parsed.error.issues.map((issue) => String(issue.path[0] ?? "event")),
+      ),
+    ].join(", ")}`;
+  if (nestingExceeds(event, 1))
+    return `nesting deeper than ${INGEST_MAX_NESTING_DEPTH} levels`;
+  if (
+    Buffer.byteLength(JSON.stringify(event), "utf8") >
+    INGEST_MAX_EVENT_BYTES - EVENT_BYTE_HEADROOM
+  )
+    return `larger than ${INGEST_MAX_EVENT_BYTES} bytes`;
+  return null;
 }
 
 export type QueueResult = "accepted" | "duplicate" | "seen" | "full";

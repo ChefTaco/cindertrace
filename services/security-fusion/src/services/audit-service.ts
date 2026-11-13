@@ -6,37 +6,47 @@ import path from "node:path";
 import { nanoid } from "nanoid";
 import type { AuditAction } from "../types/index.js";
 
-/** Keys whose values must never appear in audit logs or console output. */
-const SENSITIVE_KEYS = new Set([
-  "token",
-  "password",
-  "secret",
-  "apiKey",
-  "api_key",
-  "apiSecret",
-  "api_secret",
-  "authorization",
-  "nodeToken",
-  "nodeManagerSecret",
-  "x-node-token",
-  "x-api-secret",
-  "jwt",
-  "jwtSecret",
-  "jwt_secret",
-  "deployPassword",
-  "deploy_password",
-  "credentials",
-  "privateKey",
-  "private_key",
-  "accessToken",
-  "access_token",
-  "refreshToken",
-  "refresh_token",
-]);
+/** Keys whose values must never appear in audit logs or console output. Matched without regard to case. */
+const SENSITIVE_KEYS = new Set(
+  [
+    "token",
+    "password",
+    "secret",
+    "apiKey",
+    "api_key",
+    "apiSecret",
+    "api_secret",
+    "authorization",
+    "nodeToken",
+    "nodeManagerSecret",
+    "x-node-token",
+    "x-api-secret",
+    "jwt",
+    "jwtSecret",
+    "jwt_secret",
+    "deployPassword",
+    "deploy_password",
+    "credentials",
+    "privateKey",
+    "private_key",
+    "accessToken",
+    "access_token",
+    "refreshToken",
+    "refresh_token",
+  ].map((key) => key.toLowerCase()),
+);
+
+function sanitizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.slice(0, 100).map(sanitizeValue);
+  if (value && typeof value === "object")
+    return sanitizeDetails(value as Record<string, unknown>);
+  return value;
+}
 
 /**
  * Recursively strip sensitive fields from an object.
- * Returns a shallow clone with secret values replaced by '[REDACTED]'.
+ * Returns a clone with secret values replaced by '[REDACTED]'; arrays keep
+ * their first 100 items.
  */
 export function sanitizeDetails(
   obj: Record<string, unknown> | undefined,
@@ -44,23 +54,10 @@ export function sanitizeDetails(
   if (!obj) return {};
 
   const clean: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (SENSITIVE_KEYS.has(key) || SENSITIVE_KEYS.has(key.toLowerCase())) {
-      clean[key] = "[REDACTED]";
-    } else if (Array.isArray(value)) {
-      clean[key] = value
-        .slice(0, 100)
-        .map((item) =>
-          item && typeof item === "object"
-            ? sanitizeDetails(item as Record<string, unknown>)
-            : item,
-        );
-    } else if (value && typeof value === "object") {
-      clean[key] = sanitizeDetails(value as Record<string, unknown>);
-    } else {
-      clean[key] = value;
-    }
-  }
+  for (const [key, value] of Object.entries(obj))
+    clean[key] = SENSITIVE_KEYS.has(key.toLowerCase())
+      ? "[REDACTED]"
+      : sanitizeValue(value);
   return clean;
 }
 

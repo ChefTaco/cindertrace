@@ -43,6 +43,7 @@ import {
   readSecurityCollectorRuntimeConfig,
   singleFlight,
   checkpointedPoll,
+  ingestRejection,
 } from "./runtime-security.js";
 import { fetchCompleteLokiWindow } from "./loki-query.js";
 import {
@@ -101,6 +102,12 @@ function setSourceStatus(
 
 function enqueue(event: SecurityFusionEvent | null): boolean {
   if (!event) return true;
+  const rejection = ingestRejection(event);
+  if (rejection) {
+    // Retrying cannot make this event admissible; drop it so its batch is not refused forever.
+    console.error(`${event.source} event dropped before ingest: ${rejection}`);
+    return true;
+  }
   const currentHealth = sourceHealth.get(event.source);
   const latestEventAt =
     !currentHealth?.lastEventAt || event.observedAt > currentHealth.lastEventAt

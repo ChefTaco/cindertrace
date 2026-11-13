@@ -86,12 +86,6 @@ function label(kind: string, value: string): string {
     .slice(0, 24);
 }
 
-export function resolveTrustedClientAddress(headers: Headers): string {
-  if (headers.get("x-magnus-edge-normalized") !== "1") return "unverified";
-  const address = headers.get("x-real-ip")?.trim();
-  return address && address.length <= 64 ? address : "unverified";
-}
-
 export function createAuthProtection(
   store: AuthRateLimitStore,
   sleep: (milliseconds: number) => Promise<void> = (milliseconds) =>
