@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   BoundedSecurityEventQueue,
   boundedFetch,
+  ingestRejection,
   parseBoundedJson,
   readResponseBodyBounded,
   readSecurityCollectorRuntimeConfig,
@@ -263,5 +264,45 @@ describe("single flight", () => {
     await expect(first).resolves.toBe("done");
     await expect(run()).resolves.toBe("done");
     expect(operation).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("ingest admission", () => {
+  it("admits a well-formed event", () => {
+    expect(ingestRejection(event("a"))).toBeNull();
+  });
+
+  it("names the invalid fields of an event the API would refuse, without their content", () => {
+    const marker = "fixture-content-marker";
+    const reason = ingestRejection({
+      ...event("a"),
+      summary: "",
+      kind: marker.repeat(20),
+      sourceEventId: marker.repeat(40),
+      entities: [{ type: "host", value: "" }],
+    });
+    expect(reason).toBe("invalid sourceEventId, kind, summary, entities");
+    expect(reason).not.toContain(marker);
+  });
+
+  it("refuses an event nested deeper than the API accepts", () => {
+    const nested = (levels: number): unknown =>
+      levels === 0 ? "leaf" : { next: nested(levels - 1) };
+    // The event is level one and `attributes` level two, so six more levels reach the limit.
+    expect(
+      ingestRejection({ ...event("a"), attributes: { next: nested(5) } }),
+    ).toBeNull();
+    expect(
+      ingestRejection({ ...event("a"), attributes: { next: nested(6) } }),
+    ).toBe("nesting deeper than 8 levels");
+  });
+
+  it("refuses an event larger than the API accepts", () => {
+    expect(
+      ingestRejection({
+        ...event("a"),
+        attributes: { detail: "x".repeat(33_000) },
+      }),
+    ).toBe("larger than 32768 bytes");
   });
 });
