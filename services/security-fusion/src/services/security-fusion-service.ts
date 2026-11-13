@@ -1107,6 +1107,7 @@ async function deleteArchivedCase(
       db.securityFusionCaseRelationship.count({
         where: { OR: [{ fromCaseId: caseId }, { toCaseId: caseId }] },
       }),
+      db.securityFusionAssurancePacket.count({ where: { caseId } }),
     ]),
   ]);
   await deleteEvidenceWithReceipts(evidence, "case_retention", deletedAt);
@@ -1126,6 +1127,7 @@ async function deleteArchivedCase(
         investigations: counts[3],
         actions: counts[4],
         relationships: counts[5],
+        assurancePackets: counts[6],
         evidence: evidence.length,
       },
     },
@@ -1142,6 +1144,8 @@ async function deleteArchivedCase(
     await tx.securityFusionLabCheckpoint.deleteMany({ where: { runId: { in: runIds } } });
     await tx.securityFusionLabRun.deleteMany({ where: { caseId } });
     await tx.securityFusionInvestigation.deleteMany({ where: { caseId } });
+    // Assurance packets hold case content and must not outlive the case.
+    await tx.securityFusionAssurancePacket.deleteMany({ where: { caseId } });
     await tx.securityFusionCaseEntity.deleteMany({ where: { caseId } });
     await tx.securityFusionCaseEvent.deleteMany({ where: { caseId } });
     await tx.securityFusionDelivery.deleteMany({ where: { caseId } });
