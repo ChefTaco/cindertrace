@@ -1,6 +1,6 @@
 {
   "name": "@cindertrace/api",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Cindertrace api",
   "type": "module",
   "engines": {
@@ -15,8 +15,8 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@cindertrace/contracts": "0.6.1",
-    "@cindertrace/integrations": "0.6.1",
+    "@cindertrace/contracts": "0.7.0",
+    "@cindertrace/integrations": "0.7.0",
     "@hivemagnus/hive-common": "^0.4.0",
     "@hono/node-server": "^2.1.8",
     "@prisma/adapter-pg": "7.10.1",
