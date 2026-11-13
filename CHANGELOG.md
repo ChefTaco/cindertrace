@@ -2,9 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Ingest no longer fails a whole batch with a 500 when one event carries a zero or out-of-range `observedAt`. The 15-minute correlation window subtracted from a zero time such as `0001-01-01T00:00:00Z` underflowed the database date range (SQLSTATE 22008). `POST /api/v1/security-fusion/ingest/events` now rejects each event whose `observedAt` is before `2000-01-01T00:00:00Z` or more than 60 minutes after receipt, stores the rest of the batch, and still answers 202. The response `data` gains `rejected`: one `{index, eventId, status: 400, code: "INGEST_TIMESTAMP_OUT_OF_RANGE", message}` per rejected event. The API logs each rejection's index, code, source and kind, and counts them in the `security_fusion_ingest_events_rejected` metric.
+- The collector stamps Tailscale, Hive and ChatterMost events at receive time when the upstream timestamp is a zero time, the Unix epoch or unparsable. `tailscale status --json` reports `LastSeen` as the zero time for peers that are online, which produced these events. Event IDs are unchanged, so replays still deduplicate.
+
 ### Security
 
 - Update `@hono/node-server` to 2.1.8 for GHSA-qv5m-9pm6-hqp3 and GHSA-jpvv-r467-5p4w.
+
+No database migration is required.
 
 ## [0.6.0] - 2026-11-12
 

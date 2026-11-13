@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateUnifiLokiEvents,
+  externalEvent,
   parseCef,
   parseDnsmasq,
   parseFlowDatagram,
   parseUnifiLokiEntry,
+  plausibleTime,
 } from './parsers.js';
 
 describe('Security Fusion source parsers', () => {
@@ -73,5 +75,24 @@ describe('Security Fusion source parsers', () => {
     expect(aggregate.every((event) => event.attributes['destinationService'] === 'other-high-ports')).toBe(true);
     expect(aggregate.every((event) => (event.attributes['sampleDestinationPorts'] as string[]).length === 8)).toBe(true);
     expect(aggregate.every((event) => event.attributes['observationCount'] === 500)).toBe(true);
+  });
+  it('uses receive time for zero, epoch and unparsable upstream timestamps', () => {
+    const now = new Date('2026-11-12T10:00:00.000Z');
+    for (const value of ['0001-01-01T00:00:00Z', '1970-01-01T00:00:00Z', '', 'not a time'])
+      expect(plausibleTime(value, now)).toBe(now.toISOString());
+    expect(plausibleTime('2026-11-12T09:59:30+00:00', now)).toBe('2026-11-12T09:59:30.000Z');
+  });
+  it('stamps a peer with a zero LastSeen at receive time, keeping its stable ID', () => {
+    const before = Date.now();
+    const event = externalEvent('tailscale', {
+      id: 'node-1:true:0001-01-01T00:00:00Z',
+      timestamp: '0001-01-01T00:00:00Z',
+      eventType: 'tailscale.peer.online',
+      title: 'peer-a is online on the tailnet',
+      hostName: 'peer-a',
+      online: true,
+    });
+    expect(Date.parse(event.observedAt)).toBeGreaterThanOrEqual(before);
+    expect(event.sourceEventId).toBe('node-1:true:0001-01-01T00:00:00Z');
   });
 });
