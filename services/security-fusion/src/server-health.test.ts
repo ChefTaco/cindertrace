@@ -66,3 +66,14 @@ it("keeps the existing error body while echoing the request id", async () => {
     error: { code: "UNAUTHORIZED", message: "Invalid or expired security token" },
   });
 });
+
+it("sends no-store and nosniff on every response, after the handler, and no other security headers", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  for (const path of ["/health", "/health/live", "/api/v1/security-fusion/cases", "/no-such-route"]) {
+    const response = await app.request(path);
+    expect(response.headers.get("cache-control"), path).toBe("no-store");
+    expect(response.headers.get("x-content-type-options"), path).toBe("nosniff");
+    expect(response.headers.get("referrer-policy"), path).toBeNull();
+    expect(response.headers.get("x-frame-options"), path).toBeNull();
+  }
+});

@@ -1,5 +1,5 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { jwtVerify } from "jose";
+import { matchesSha256Digest, timingSafeEqualString } from "@hivemagnus/hive-common/secrets";
 import type { Context, Next } from "hono";
 import type {
   AppVariables,
@@ -12,20 +12,16 @@ import { oathweaveAuthentication } from './oathweave.js';
 import { getCookie } from 'hono/cookie';
 import { browserAuthEnabled, browserSessions, COOKIE_NAME } from '../browser-auth/sessions.js';
 import { exactBrowserOrigin } from '../browser-auth/origin.js';
+/** Constant-time string equality; strings of different byte length are unequal. */
 export function safeEqual(a: string, b: string): boolean {
-  const aa = Buffer.from(a),
-    bb = Buffer.from(b);
-  return aa.length === bb.length && timingSafeEqual(aa, bb);
+  return timingSafeEqualString(a, b);
 }
+/** Whether `token` hashes to the stored lowercase-hex SHA-256 digest. An empty token or unset digest never matches. */
 export function tokenMatches(
   token: string,
   digest: string | undefined,
 ): boolean {
-  return Boolean(
-    token &&
-      digest &&
-      safeEqual(createHash("sha256").update(token).digest("hex"), digest),
-  );
+  return matchesSha256Digest(token, digest);
 }
 export async function authMiddleware(c: Context<AppVariables>, next: Next) {
   const token = c.req.header("Authorization")?.replace(/^Bearer /, "") ?? "";
