@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Update `@hivemagnus/hive-common` to 0.5.0. The API now uses its shared helpers where they give the same results as Cindertrace's own copies: the SHA-256 checks of static service, metrics and summary credentials and the local administrator login comparison (`/secrets`), the `Cache-Control: no-store` and `X-Content-Type-Options: nosniff` headers on every response (`securityHeaders()`), and the `(occurredAt, id)` order of the HiveEvent feed. A comparison of strings of different length now takes about as long as one of equal length. Responses, status codes and feed cursors are unchanged.
+
+No database migration is required.
+
 ## [0.7.0] - 2026-11-13
 
 ### Fixed

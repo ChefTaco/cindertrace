@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { timingSafeEqualString } from "@hivemagnus/hive-common/secrets";
 import { verify } from "argon2";
 
 /** Preserve dedicated console credentials and their generation inputs on adoption. */
@@ -26,11 +26,7 @@ export function credentials(env: NodeJS.ProcessEnv = process.env): {
     throw Error("Dedicated administrator credentials are required");
   return { username, passwordHash };
 }
-function equal(a: string, b: string): boolean {
-  const left = Buffer.from(a),
-    right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
+const equal = timingSafeEqualString;
 export async function validateLocalCredentials(
   username: string,
   password: string,

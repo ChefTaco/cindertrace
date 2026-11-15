@@ -205,6 +205,10 @@ describe("Cindertrace HiveEvent feed", () => {
     });
     const { events } = await readAll(2, tied);
     expect(new Set(events.map((event) => event.id)).size).toBe(7);
+    // Events at one instant are served in ID order (UTF-16 code units), across pages too.
+    const ids = events.map((event) => event.id);
+    expect(ids).toEqual([...ids].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+    expect(ids).toEqual((await readAll(200, tied)).events.map((event) => event.id));
   });
 
   it("serves only the last 14 days", async () => {

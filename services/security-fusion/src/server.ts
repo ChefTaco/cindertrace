@@ -14,16 +14,22 @@ import { renderMetrics } from "./routes/metrics.js";
 import type { AppVariables } from "./types/index.js";
 import { oathweaveBrowserRouter } from './browser-auth/oathweave-routes.js';
 import { browserAuthRouter } from './browser-auth/routes.js';
-import { registerHealthRoutes, requestContext } from "@hivemagnus/hive-common/hono";
+import { registerHealthRoutes, requestContext, securityHeaders } from "@hivemagnus/hive-common/hono";
 export const app = new Hono<AppVariables>();
 app.onError(errorHandler);
 app.use("*", requestContext());
 app.use("*", bodyLimitMiddleware(262144));
-app.use("*", async (c, next) => {
-  await next();
-  c.header("Cache-Control", "no-store");
-  c.header("X-Content-Type-Options", "nosniff");
-});
+// Set once the handler is done, replacing what it set: every response is no-store and nosniff.
+// The suite's Referrer-Policy and X-Frame-Options defaults are not sent; that is a separate change.
+app.use(
+  "*",
+  securityHeaders({
+    apply: "after",
+    referrerPolicy: false,
+    frameOptions: false,
+    headers: { "Cache-Control": "no-store" },
+  }),
+);
 app.route('/api/v1/auth/local', browserAuthRouter());
 app.route('/api/v1/auth/oathweave', oathweaveBrowserRouter());
 app.get("/health", (c) =>

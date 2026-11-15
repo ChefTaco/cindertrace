@@ -7,7 +7,7 @@ import {
   type HiveEventSeverity,
   type Page,
 } from "@hivemagnus/hive-common/events";
-import { isAgentRef, isIdentifier, parseAgentRef } from "@hivemagnus/hive-common/contracts";
+import { compareFeedPositions, isAgentRef, isIdentifier, parseAgentRef } from "@hivemagnus/hive-common/contracts";
 import { CINDERTRACE_HIVE_EVENT_TYPES } from "@cindertrace/contracts/browser";
 import { getDb } from "../db/index.js";
 import { HttpError } from "../middleware/error-handler.js";
@@ -395,11 +395,6 @@ function after(event: HiveEvent, position: Position | undefined): boolean {
   return time > position.time || (time === position.time && event.id > position.id);
 }
 
-function compare(a: HiveEvent, b: HiveEvent): number {
-  const delta = Date.parse(a.occurredAt) - Date.parse(b.occurredAt);
-  return delta !== 0 ? delta : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-}
-
 export function hiveEventCursor(event: HiveEvent): string {
   return encodeCursor({ t: event.occurredAt, id: event.id });
 }
@@ -497,6 +492,7 @@ export async function readHiveEventFeed(options: HiveEventFeedOptions): Promise<
     }
     if (Date.parse(result.value.occurredAt) >= cutoff && after(result.value, position)) events.push(result.value);
   }
-  events.sort(compare);
+  // Validated events have RFC 3339 times, so this is the (occurredAt, id) order of the cursor.
+  events.sort(compareFeedPositions);
   return feedPage(events.slice(0, take), options.limit, hiveEventCursor);
 }

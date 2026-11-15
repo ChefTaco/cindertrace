@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { Hono } from "hono";
 import { createHash } from "node:crypto";
 import { SignJWT } from "jose";
-import { authMiddleware, requirePermission, requireRole } from "./auth.js";
+import { authMiddleware, requirePermission, requireRole, safeEqual, tokenMatches } from "./auth.js";
 import type { AppVariables } from "../types/index.js";
 import { errorHandler } from "./error-handler.js";
 const app = new Hono<AppVariables>();
@@ -126,5 +126,28 @@ describe("independent authorization", () => {
         })
       ).status,
     ).toBe(401);
+  });
+});
+
+describe("static credential comparison", () => {
+  const digest = (value: string) => createHash("sha256").update(value).digest("hex");
+  it("matches a token only against its exact lowercase-hex SHA-256 digest", () => {
+    const token = "t".repeat(40);
+    expect(tokenMatches(token, digest(token))).toBe(true);
+    expect(tokenMatches(token, digest(token).toUpperCase())).toBe(false);
+    expect(tokenMatches(`${token}x`, digest(token))).toBe(false);
+    expect(tokenMatches(token, digest(token).slice(1))).toBe(false);
+    expect(tokenMatches("", digest(""))).toBe(false);
+    expect(tokenMatches(token, undefined)).toBe(false);
+    expect(tokenMatches(token, "")).toBe(false);
+    expect(tokenMatches("töken-ü", digest("töken-ü"))).toBe(true);
+  });
+  it("compares strings exactly, refusing different lengths", () => {
+    expect(safeEqual("abc", "abc")).toBe(true);
+    expect(safeEqual("abc", "abd")).toBe(false);
+    expect(safeEqual("abc", "abcd")).toBe(false);
+    expect(safeEqual("", "")).toBe(true);
+    // Same character count, different UTF-8 byte length.
+    expect(safeEqual("é", "e")).toBe(false);
   });
 });
