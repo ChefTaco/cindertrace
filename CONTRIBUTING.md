@@ -6,6 +6,12 @@ Never commit local configuration, databases, evidence, private provenance, or
 live screenshots. Scan the staged index before committing and built payloads
 before publication. Describe changes with Conventional Commits.
 
+`npm run verify` is what CI runs. The integration suites run against disposable
+installations and refuse to start without their explicit confirmation variable
+(for example `CINDERTRACE_RECOVERY_TEST_CONFIRM`); read each script's header first:
+`npm run test:core`, `test:recovery`, `test:upgrade`, `test:browser-auth`,
+`test:response`, `test:lab` and `test:lab:browser`.
+
 Read the [privacy guidance](PRIVACY.md) before preparing fixtures or reports.
 Keep deployment-specific acceptance records outside this public repository;
 documentation should describe supported behavior and reproducible commands.
