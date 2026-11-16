@@ -1,20 +1,29 @@
 # Cindertrace
 
-Cindertrace is a self-hosted security investigation and response console. It
-correlates network, endpoint, identity, and application observations into cases,
-preserves sanitized evidence, records revisioned investigations and assurance,
-and keeps an auditable approval trail for response actions.
+Cindertrace is the self-hosted security event collection, investigation and
+response product of the [Hive:Magnus](https://github.com/ChefTaco/hive) suite. Its
+API correlates network, endpoint, identity, and application observations into
+cases, preserves sanitized evidence, records revisioned investigations and
+assurance, and keeps an auditable approval trail for response actions. Its
+collector also pulls the suite products' audit exports.
 
-It runs independently with local administrator login, PostgreSQL, and Redis.
+[HiveXUI](https://github.com/ChefTaco/HiveXUI) is the UI for Cindertrace in the suite.
+The API also runs on its own, with local administrator login, PostgreSQL, and Redis.
 [Hive](https://github.com/ChefTaco/hive) can provide identity and security audit
 metadata. [Magnus](https://github.com/ChefTaco/magnus) can supply fleet context
 and execute explicitly approved host responses. Both integrations are optional.
+
+**Standalone console.** The repository still ships its own web console
+(`apps/security-console`) for standalone installations, local recovery sign-in and the
+investigation lab. Like the other products' standalone UIs it is being retired in favour
+of HiveXUI; it stays until HiveXUI parity and restored-data acceptance pass (see
+[browser authentication](docs/BROWSER_AUTH.md)). Do not build new workflows on it.
 
 ## Install
 
 Requirements: Node.js 24.22.3+ on the 24.x line or 26.13.1+ on the 26.x line, npm, OpenSSL, and Docker
 with Compose. From a clean checkout of a release tag, for example
-`git clone --branch v0.7.0 https://github.com/ChefTaco/cindertrace.git`:
+`git clone --branch v0.7.1 https://github.com/ChefTaco/cindertrace.git`:
 
 ```sh
 npm ci
@@ -22,8 +31,9 @@ npm run init
 docker compose up --build -d
 ```
 
-Open `https://localhost:3444`. The initial administrator credentials are written
-only to `state/initial-credentials.txt`. Trust the generated local certificate
+This stack runs the API (port 4101 inside the Compose network), PostgreSQL, Redis and the
+standalone console. Open the console at `https://localhost:3444`. The initial
+administrator credentials are written only to `state/initial-credentials.txt`. Trust the generated local certificate
 for local development; use your own CA-issued certificate for remote access.
 The console binds to loopback by default. Database and Redis ports are private
 to the Compose network. Source adapters are disabled until configured.
@@ -40,14 +50,14 @@ See [installation](docs/INSTALLATION.md), [integrations](docs/INTEGRATIONS.md),
 [publication](docs/PUBLISHING.md).
 
 Releases from 0.2.0 on are published as the container image
-`ghcr.io/cheftaco/cindertrace`, tagged with the exact version (for example `0.7.0`) for
+`ghcr.io/cheftaco/cindertrace`, tagged with the exact version (for example `0.7.1`) for
 `linux/amd64` and `linux/arm64` with a build provenance attestation. Each
 [GitHub release](https://github.com/ChefTaco/cindertrace/releases) records the source
 commit, source tree and image digest; it has no downloadable assets. The Compose stack
 above builds the image locally from your checkout. In a Hive installation, the suite's
 `full` profile installs the published image through `hive.sh`, the
-[Hive suite controller](https://github.com/ChefTaco/hive#install-the-suite); Hive 3.9.1
-pins Cindertrace 0.7.0. Only the 0.1.0 release has a native runtime archive, SHA-256
+[Hive suite controller](https://github.com/ChefTaco/hive#install-the-suite); Hive 3.11.0
+pins Cindertrace 0.7.1. Only the 0.1.0 release has a native runtime archive, SHA-256
 checksum and publication review attached. For later releases, build the native archive
 yourself with `npm run release:bundle`, as the [upgrade runbook](docs/UPGRADING.md)
 describes.
@@ -88,7 +98,9 @@ npm run verify
 The npm workspace contains `apps/security-console`, `services/security-fusion`,
 `services/security-collector`, `packages/contracts`, and `packages/integrations`.
 The `/security-fusion` pages and `/api/v1/security-fusion` API paths remain stable
-for existing clients. Cindertrace is the product name; legacy wire identifiers
+for existing clients. `npm run verify` is the CI gate (build, typecheck, tool identifiers,
+tests, OpenAPI and privacy checks); [CONTRIBUTING.md](CONTRIBUTING.md) lists the
+integration suites. Cindertrace is the product name; legacy wire identifiers
 are retained for data and signature compatibility.
 
 ## Security model
@@ -102,10 +114,6 @@ at most once. Unknown outcomes require review and are never automatically replay
 
 No response controls are enabled without the Magnus bridge. Installing Cindertrace
 does not install a fleet agent, alter host firewalls, or provision external sources.
-
-## License
-
-Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and bundled font notices.
 
 ## Evolving investigation lab
 
@@ -133,3 +141,7 @@ only the lab containers and database volumes, run `npm run lab -- destroy NAME`,
 where NAME is the exact `COMPOSE_PROJECT_NAME` in that lab's configuration. Local
 state and credentials remain in its separate checkout until you remove it.
 See [lab workflow and agent API](docs/INVESTIGATION-LAB.md).
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and bundled font notices.
