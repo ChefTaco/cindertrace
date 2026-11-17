@@ -29,8 +29,8 @@ const sessions = new BrowserSessions(client, env);
 // A session record exactly as Cindertrace 0.7.x's standalone console wrote it (Redis keys,
 // generation and credential digest), so the API keeps accepting and revoking existing cookies.
 const recordKey = username => `cindertrace_session:local:${createHmac("sha256", sessions.secret()).update(username).digest("hex")}`;
-const credentialDigest = () => createHmac("sha256", sessions.secret())
-  .update(JSON.stringify([env.DASHBOARD_ADMIN_USERNAME, env.DASHBOARD_ADMIN_PASSWORD, ""])).digest("hex");
+// The credential digest is the API's own (credentials.test.ts covers its inputs).
+const credentialDigest = () => sessions.credentialGeneration();
 async function legacySession(username) {
   const id = randomUUID(), key = recordKey(username), generation = randomUUID();
   await client.set(`${key}:generation`, generation, "EX", 86400);
