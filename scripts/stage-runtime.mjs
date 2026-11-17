@@ -1,4 +1,3 @@
-import { DEPENDENCY_PACKAGES as CONSOLE_EXTERNALS } from "../apps/security-console/scripts/stage.mjs";
 import { runtimeDependencyFile, bundleJoseRuntime } from "./runtime-dependencies.mjs";
 import {
   readFileSync,
@@ -17,7 +16,6 @@ import { resolve, join, dirname, relative, isAbsolute } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const destination = join(root, "artifacts/runtime");
 const workspaces = [
-  "apps/security-console",
   "services/security-fusion",
   "services/security-collector",
   "packages/contracts",
@@ -103,25 +101,15 @@ function visit(path) {
 copy(join(root, "package.json"), join(destination, "package.json"));
 for (const name of ["LICENSE", "NOTICE"])
   copy(join(root, name), join(destination, name));
-copy(
-  join(root, "apps/security-console/src/app/fonts/OFL.txt"),
-  join(destination, "apps/security-console/src/app/fonts/OFL.txt"),
-);
 for (const workspace of workspaces) {
   const path = join(root, workspace);
   copy(
     join(path, "package.json"),
     join(destination, workspace, "package.json"),
   );
-  if (workspace !== "apps/security-console")
-    copy(join(path, "dist"), join(destination, workspace, "dist"));
-  if (workspace === "apps/security-console") {
-    // Next's standalone trace already contains its production dependency closure.
-    // Only packages deliberately externalized by console staging belong here.
-    for (const name of CONSOLE_EXTERNALS) visit(resolvePackage(path, name).path);
-  } else visit(path);
+  copy(join(path, "dist"), join(destination, workspace, "dist"));
+  visit(path);
 }
-copy(join(root, "apps/security-console/dist"), join(destination, "console"));
 copy(
   join(root, "services/security-fusion/prisma"),
   join(destination, "services/security-fusion/prisma"),
@@ -139,10 +127,9 @@ for (const name of [
   "lab-integration.mjs",
   "upgrade.mjs",
   "upgrade-policy.mjs",
-  "upgrade-artifacts.mjs",
   "upgrade-probe.mjs",
   "upgrade-compose.mjs",
-  "upgrade-native.mjs",
+  "ui-gateway.mjs",
 ])
   copy(join(root, "scripts", name), join(destination, "scripts", name));
 for (const path of copied) {

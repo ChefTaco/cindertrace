@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { randomBytes, randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { Redis } from "ioredis";
 import { SignJWT, jwtVerify } from "jose";
 import { BrowserSessions } from "../services/security-fusion/dist/browser-auth/sessions.js";
@@ -27,29 +26,26 @@ const client = new Redis(env.REDIS_URL, {
 });
 client.on("error", () => undefined);
 const sessions = new BrowserSessions(client, env);
-const legacyModule = new URL(
-  "../apps/security-console/runtime-local-sessions.mjs",
-  import.meta.url,
-).href;
-function legacy(action, payload) {
-  return execFileSync(
-    process.execPath,
-    [
-      "--input-type=module",
-      "-e",
-      `const {${action}}=await import(${JSON.stringify(legacyModule)});const input=JSON.parse(await new Response(process.stdin).text());const value=await ${action}(...input);process.stdout.write(JSON.stringify(value));process.exit(0);`,
-    ],
-    {
-      input: JSON.stringify(payload),
-      encoding: "utf8",
-      env: { PATH: process.env.PATH, ...env },
-      timeout: 10000,
-    },
-  );
+// A session record exactly as Cindertrace 0.7.x's standalone console wrote it (Redis keys,
+// generation and credential digest), so the API keeps accepting and revoking existing cookies.
+const recordKey = username => `cindertrace_session:local:${createHmac("sha256", sessions.secret()).update(username).digest("hex")}`;
+// The credential digest is the API's own (credentials.test.ts covers its inputs).
+const credentialDigest = () => sessions.credentialGeneration();
+async function legacySession(username) {
+  const id = randomUUID(), key = recordKey(username), generation = randomUUID();
+  await client.set(`${key}:generation`, generation, "EX", 86400);
+  await client.zadd(`${key}:sessions`, Date.now() * 1000 + 86400e6, id);
+  await client.set(`${key}:session:${id}`, `${generation}:${credentialDigest()}`, "EX", 86400);
+  return id;
+}
+async function legacyValid(username, id) {
+  const key = recordKey(username);
+  const [generation, record] = await client.mget(`${key}:generation`, `${key}:session:${id}`);
+  return Boolean(generation && record === `${generation}:${credentialDigest()}`);
 }
 try {
   await client.ping();
-  const legacyId = JSON.parse(legacy("createLocalSession", ["admin"]));
+  const legacyId = await legacySession("admin");
   const legacyToken = await new SignJWT({
     username: "admin",
     sessionId: legacyId,
@@ -63,16 +59,9 @@ try {
   assert.equal((await sessions.verify(legacyToken))?.sessionId, legacyId);
   const apiToken = await sessions.create("admin"),
     payload = (await jwtVerify(apiToken, sessions.secret())).payload;
-  assert.equal(JSON.parse(legacy("verifyLocalSession", [payload])), true);
+  assert.equal(await legacyValid(payload.username, payload.sessionId), true);
   await sessions.revoke(await sessions.verify(legacyToken));
-  assert.equal(
-    JSON.parse(
-      legacy("verifyLocalSession", [
-        { username: "admin", sessionId: legacyId },
-      ]),
-    ),
-    false,
-  );
+  assert.equal(await legacyValid("admin", legacyId), false);
   for (let index = 0; index < 55; index++) await sessions.create("admin");
   assert.equal(await client.zcard(sessions.key("admin") + ":sessions"), 50);
   const current = await sessions.create("admin");
@@ -92,7 +81,7 @@ try {
       ok: true,
       checks: [
         "legacy session adopted without reseeding",
-        "API session accepted by legacy console",
+        "API session uses the 0.7.x record format",
         "single-session and all-session revocation",
         "exact fifty-session bound",
         "durable pair throttling",

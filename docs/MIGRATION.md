@@ -59,7 +59,7 @@ the security state archive and configured audit files and receipt ledger.
 containing the complete installation configuration. `UI_SECURITY_LOG_PATH` includes
 the configured UI audit file when it exists. The managed upgrade command prepares
 the complete service environments and TLS material automatically. A manually
-configured backup must explicitly include console/collector configuration and
+configured backup must explicitly include gateway/collector configuration and
 required signing material; the API environment alone may not contain all of them.
 
 Restored environments, installation material, and UI audit copies are written to
@@ -76,7 +76,7 @@ Before destination writes, restore the prior verified application with its
 compatible state. After writes, freeze both sides and reconcile the current state;
 never overwrite new evidence with an old backup. Retain unknown effects for review.
 
-After cutover, observe 24 hours of fresh configured sources, healthy API/console,
+After cutover, observe 24 hours of fresh configured sources, healthy API/gateway,
 healthy backups, one writer/dispatcher, and no duplicate execution. Preserve failed
 samples. Historical acceptance does not conceal a later operational incident.
 

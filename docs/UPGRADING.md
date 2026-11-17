@@ -1,7 +1,7 @@
 # Upgrading Cindertrace
 
-Cindertrace has a dedicated upgrade command for Compose installations and native
-systemd installations. Run it on the installation host. It keeps configuration,
+Cindertrace has a dedicated upgrade command for Compose installations. Run it on the
+installation host. It keeps configuration,
 PostgreSQL, Redis, evidence, audit, and collector state outside the replacement
 application. Upgrade records and diagnostics are private; never publish them.
 
@@ -16,7 +16,8 @@ git fetch origin --tags
 git rev-parse 'v0.1.0^{commit}'
 ```
 
-Pass the resulting 40-character commit as `--to`. The command does not select
+Pass the resulting 40-character commit as `--to`. Moving a 0.7.x installation to 0.8.0
+is a one-time manual step instead; see [From 0.7.x to 0.8.0](#from-07x-to-080). The command does not select
 `latest`, reset your checkout, replace secrets, or regenerate installation keys.
 Obtain the current upgrade tooling in a separate trusted checkout if the installed
 source predates the upgrade command. Supported Node versions are 24.22.3 or later
@@ -50,61 +51,69 @@ npm run upgrade -- --to COMMIT --project-dir /opt/cindertrace --dry-run
 npm run upgrade -- resume --id UPGRADE_ID --project-dir /opt/cindertrace
 ```
 
-## Native systemd installations
+## From 0.7.x to 0.8.0
 
-Use the root-owned mode-0600 installation manifest shown in
-[examples/native-installation.json](../examples/native-installation.json), with
-paths, service users, verified HTTPS health URLs, and maintenance units matching
-the actual installation. Application files must be release symlinks; configuration
-and state must remain outside those links. The runtime archive includes the
-host-side `scripts/upgrade*.mjs` tools; use the reviewed release's tools together
-in a trusted directory. The command uses the existing PostgreSQL
-role, local `postgres` maintenance account, and installed native PostgreSQL tools.
-The API and console must use one application service account. The collector is
-optional; when present, it must use that same account. Other service layouts need
-a separately reviewed installation migration before using this command.
+0.8.0 removes the standalone console. A Compose installation serves HiveXUI through the
+gateway instead ([installation](INSTALLATION.md#the-ui-hivexui-in-local-mode)), at the same
+address and port, signed in by the API. The service layout changes (release layout 2),
+so the upgrade command refuses this step: the 0.7.x command stops because the release
+layout changed, and the 0.8.0 command stops while the installation still has a `console`
+service. 0.8.0 adds no database migration. Hive suite installations are unaffected; they
+never ran this console.
 
-Only the 0.1.0 release has a reviewed native archive, SHA-256 sidecar and
-publication review attached to its
-[GitHub release](https://github.com/ChefTaco/cindertrace/releases); for it, verify
-the archive's digest against the release review. Releases from 0.2.0 on publish only
-the container image and record the source commit, source tree and image digest, so
-build the native archive yourself. Build on Linux with the installation's
-architecture and a supported Node version, in a clean checkout of the release
-commit without installation `.env` files:
+1. Make and verify a recovery backup as in [recovery and migration](MIGRATION.md), and
+   keep a copy of `.env`.
+2. In the installation directory (a checkout of the release tag), stop the old services
+   and check out the release:
 
-```sh
-npm run release:bundle
-```
+   ```sh
+   docker compose stop console collector api
+   git fetch origin --tags && git checkout v0.8.0
+   ```
 
-This installs the exact lockfile, runs verification, builds and stages the runtime,
-and creates `artifacts/cindertrace-COMMIT.tar.gz` and its SHA-256 sidecar. Transfer
-both through your verified transport. Check the digest against your trusted release
-record, then run on the installation host:
+3. Create HiveXUI's runtime file, readable by HiveXUI's own account:
 
-```sh
-sudo node scripts/upgrade.mjs upgrade --to COMMIT \
-  --install /etc/cindertrace/installation.json \
-  --archive /var/lib/cindertrace-downloads/cindertrace-COMMIT.tar.gz \
-  --sha256 VERIFIED_ARCHIVE_DIGEST
-```
+   ```sh
+   mkdir -m 755 ui
+   printf '%s\n' '{"schema":1,"mode":"local","products":{"cindertrace":"/api/cindertrace"}}' > ui/runtime.json
+   chmod 644 ui/runtime.json
+   ```
 
-A native upgrade requires neither Hive nor Magnus credentials. It preserves the
-existing service names, endpoints, state paths and service users. The manifest
-must enumerate backup and TLS maintenance timers/services so they cannot race the
-ownership transfer. Keep the encryption key and a recovery copy of the installation
-manifest in your separate protected recovery store.
+4. Edit `.env`: set `CINDERTRACE_BROWSER_AUTH_ENABLED=true`; rename
+   `CINDERTRACE_CONSOLE_PORT` to `CINDERTRACE_UI_PORT` if you set it; remove
+   `CINDERTRACE_API_BROWSER_AUTH` and any console-only Hive OAuth settings
+   (`HIVE_OAUTH_*`, `DASHBOARD_LOGIN_RETURN_PATH`); remove a `CINDERTRACE_IMAGE` line left
+   by an earlier managed upgrade, so the next step builds 0.8.0 instead of retagging the
+   old image. Keep `DASHBOARD_PUBLIC_ORIGIN`, `SESSION_SECRET`, `REDIS_URL` and the
+   `DASHBOARD_ADMIN_*` values: the API now uses them, and existing local sessions stay
+   signed in. Move a port binding from `console` to `gateway` in `compose.override.yaml`.
+5. Start 0.8.0 and remove the old console container:
+
+   ```sh
+   docker compose up --build -d --wait --remove-orphans
+   ```
+
+6. Open the same address, sign in with the existing administrator credentials, and check
+   the overview, cases and evidence. Start the collector again if you run it
+   (`docker compose --profile collector up -d collector`).
+
+To go back, stop the stack, check out the previous tag, restore the saved `.env`, remove
+`ui/`, and run the same `docker compose up` command; the database is unchanged. Later
+releases use the upgrade command again.
+
+Native systemd installations are no longer supported, and 0.8.0 removes their upgrade
+backend. Move such an installation to Compose through a verified backup and restore
+([recovery and migration](MIGRATION.md)) or retire it.
 
 ## What the command verifies
 
 1. Check existing health, free space, the explicit installed schema, and unchanged
    applied migration checksums. Refuse pending approvals/dispatch, active response,
-   active isolation, or uncertain execution. Cancel pending approvals through the
-   console and reconcile uncertain effects before retrying.
+   active isolation, or uncertain execution. Cancel pending approvals in HiveXUI
+   and reconcile uncertain effects before retrying.
 2. Stage the selected release and retain the previous runtime/image. A dry run stops
    here. No application services have been changed.
-3. Pause console, collector and API, plus native maintenance units. Verify that no
-   extra database clients remain. External signed exporters can resume from their
+3. Pause the gateway, collector and API. Verify that no extra database clients remain. External signed exporters can resume from their
    existing durable checkpoints after the API returns.
 4. Create an encrypted frozen backup including security tables, evidence, audit,
    receipt ledger, configured collector boundary, environment and installation
@@ -114,7 +123,7 @@ manifest in your separate protected recovery store.
 5. Apply checksum-checked additive migrations. Re-running a completed migration is
    safe; an incomplete or conflicting migration stops the upgrade.
 6. Start the replacement with writes/ingestion/retention/notifications/dispatch
-   paused. Verify API readiness and console health using certificate verification.
+   paused. Verify API readiness and gateway health using certificate verification.
    Record the point at which writes may start, then restore configured capabilities
    and the single collector. Disabled integrations remain disabled.
 
@@ -126,9 +135,7 @@ npm run upgrade -- resume --id UPGRADE_ID --project-dir /opt/cindertrace
 npm run upgrade -- rollback --id UPGRADE_ID --project-dir /opt/cindertrace
 ```
 
-For native installations replace `--project-dir` with `--install MANIFEST` and run
-as root. Records live under `.cindertrace/upgrades` for Compose, or the native
-manifest's `recordRoot`. They contain secrets and are mode 0600 in private
+Records live under `.cindertrace/upgrades`. They contain secrets and are mode 0600 in private
 directories. Diagnostics print locations rather than credential values.
 
 Resume is permitted after preparation or a verified independent restore, before

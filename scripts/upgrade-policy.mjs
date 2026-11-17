@@ -9,7 +9,7 @@ import {
   chmodSync,
   chownSync,
 } from "node:fs";
-import { dirname, join, isAbsolute, normalize } from "node:path";
+import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 export const WRITE_FLAGS = [
   "SECURITY_WRITES_ENABLED",
@@ -65,7 +65,7 @@ export function assertSafeState(state) {
   assert.equal(
     state.pendingApprovals,
     0,
-    "Cancel pending approvals in the console before upgrading",
+    "Cancel pending approvals before upgrading",
   );
   assert.equal(
     state.unsafeExecutions,
@@ -89,20 +89,6 @@ export function assertMigrations(history, candidate) {
       "Candidate changes or omits an applied migration",
     );
   }
-}
-export function absolutePath(p) {
-  assert(
-    typeof p === "string" &&
-      isAbsolute(p) &&
-      normalize(p) === p &&
-      !/[\r\n\0]/.test(p),
-    "Expected a normalized absolute path",
-  );
-  return p;
-}
-export function unitName(p) {
-  assert(/^[a-zA-Z0-9@_.-]+\.service$/.test(p), "Invalid service unit");
-  return p;
 }
 export function privateFile(path) {
   const s = lstatSync(path);
@@ -177,33 +163,4 @@ export function assertUpgradeNode(version = process.versions.node) {
       (major === 26 && (minor > 13 || (minor === 13 && patch >= 1))),
     "Upgrade tooling requires Node >=24.22.3 on the 24.x line or >=26.13.1 on the 26.x line",
   );
-}
-
-/** Environment for a child AFTER dropping its UID; runtime injection is never inherited. */
-export function upgradeChildEnvironment(env) {
-  const result = { ...env };
-  for (const key of [
-    "NODE_OPTIONS",
-    "NODE_PATH",
-    "LD_PRELOAD",
-    "LD_LIBRARY_PATH",
-    "DYLD_INSERT_LIBRARIES",
-    "DYLD_LIBRARY_PATH",
-    "PYTHONPATH",
-    "PYTHONHOME",
-    "BASH_ENV",
-    "ENV",
-    "SHELLOPTS",
-    "HOME",
-  ])
-    delete result[key];
-  for (const key of Object.keys(result))
-    if (
-      /^(?:LD_|DYLD_|PYTHON)/.test(key) ||
-      (key.startsWith("NODE_") &&
-        !["NODE_ENV", "NODE_EXTRA_CA_CERTS"].includes(key))
-    )
-      delete result[key];
-  result.PATH = "/usr/sbin:/usr/bin:/sbin:/bin";
-  return result;
 }

@@ -1,7 +1,8 @@
 # Direct Oathweave authorization
 
-Cindertrace optionally accepts resource tokens directly from HiveXUI, without
-placing the console's signing secret in the browser. Set `OATHWEAVE_ISSUER`,
+Cindertrace optionally accepts Oathweave resource tokens directly from HiveXUI. This is
+how a Hive suite signs in to Cindertrace; HiveXUI's Oathweave client, redirect and
+consent are configured by the suite (`hive.sh`), not by Cindertrace. Set `OATHWEAVE_ISSUER`,
 `OATHWEAVE_JWKS_URL` and `OATHWEAVE_USERINFO_URL` to verified HTTPS endpoints.
 Configure private CA trust through `NODE_EXTRA_CA_CERTS` when necessary.
 
@@ -17,6 +18,8 @@ OPERATOR link with `cindertrace:investigate` acts as OPERATOR.
 no security privileges. Existing service credentials, signed ingestion, evidence
 identifiers, approvals and response dispatch rules retain their current contracts.
 
-This integration is rejected by isolated investigation-lab configuration. Existing
-standalone console authentication remains available while frontend parity and
-recovery acceptance are completed.
+This integration is rejected by isolated investigation-lab configuration. The
+standalone console and its own Oathweave sign-in were removed in 0.8.0. Outside a suite,
+HiveXUI in local mode signs in with the API's local administrator account
+([browser authentication](BROWSER_AUTH.md)); in a suite, the same local sign-in is
+HiveXUI's recovery path when Oathweave is unavailable.

@@ -16,19 +16,18 @@ Keep private source provenance and operational evidence outside Git. Re-run the
 gate after changes. Publish only the verified candidate. Never bypass hooks.
 
 Documentation-only commits can advance `main` after an application release.
-Verify the deployed manifest revision and archive digest against the published
-application release; documentation changes alone do not require a runtime
+Verify the deployed image digest against the published application release; documentation changes alone do not require a runtime
 replacement. Changes to executable code, configuration, dependencies, or schema
 require new verified application artifacts and the normal upgrade gates.
 
-Runtime staging uses the console's traced standalone dependency closure and only
-its explicitly externalized packages. Dependency documentation, declarations,
+Runtime staging copies each workspace's built output and its production dependency
+closure, plus the maintenance scripts and `scripts/ui-gateway.mjs`. Dependency documentation, declarations,
 source maps and build metadata are omitted; licenses, copyright and notices are
 retained. The runtime `jose` package is bundled from its pinned upstream source
 with only `SignJWT`, `jwtVerify` and `createRemoteJWKSet`; unused PEM import/export
 entrypoints are excluded. Executable strings and privacy rules are not rewritten.
 In-tree package aliases are materialized so the scanner reads the whole payload
-directly. Container builds, native archive packaging and CI all run the unchanged
+directly. Container builds and CI run the unchanged
 artifact scanner against the final runtime, including every shipped dependency.
 
 ## Container image

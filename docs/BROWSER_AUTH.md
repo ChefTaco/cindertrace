@@ -1,8 +1,12 @@
 # API-owned native browser authentication
 
 Suite deployments use Oathweave resource tokens and explicit issuer/subject links.
-Standalone local sign-in is also available directly from the API. Enable it with
-`CINDERTRACE_BROWSER_AUTH_ENABLED=true`, a canonical HTTPS `DASHBOARD_PUBLIC_ORIGIN`,
+Standalone installations and the investigation lab sign in directly with the API:
+HiveXUI in local mode posts to `/api/cindertrace/auth/local/*` on the gateway, which
+forwards to the API's `/api/v1/auth/local/*` ([installation](INSTALLATION.md#the-ui-hivexui-in-local-mode)).
+The same sign-in is HiveXUI's recovery path in a suite when Oathweave is unavailable.
+`npm run init` enables it. It needs `CINDERTRACE_BROWSER_AUTH_ENABLED=true`, a canonical
+HTTPS `DASHBOARD_PUBLIC_ORIGIN` equal to the page origin,
 `REDIS_URL`, `SESSION_SECRET`, and dedicated `DASHBOARD_ADMIN_USERNAME` plus
 `DASHBOARD_ADMIN_PASSWORD_HASH` (Argon2id). Dedicated plaintext or base64-encoded
 credentials remain accepted for explicit compatibility; infrastructure passwords
@@ -10,7 +14,7 @@ are never a fallback. `DASHBOARD_ADMIN_ACCOUNT_ID` preserves the reviewed local
 account identity. `AUTH_RATE_LIMIT_LABEL_KEY` is optional and defaults to the
 session secret; both require at least 32 characters.
 
-`RELAX_AUTH_LIMITS=true` is for testing only. The API and console sign-in throttles
+`RELAX_AUTH_LIMITS=true` is for testing only. The API sign-in throttles
 stay enabled with a ceiling of 10000 attempts per window and no retry delay, and the
 Oathweave session exchange limit rises to the same ceiling. Credential checks and
 audit events are unchanged, and nothing is written to stored state, so removing the
@@ -38,18 +42,16 @@ Preserve `SESSION_SECRET`, `SESSION_ISSUER`, `SESSION_AUDIENCE`,
 `LOCAL_SESSION_GENERATION`, dedicated credential values (including their encoded
 form), and the exact Redis data. The API adopts the existing local key prefix,
 credential-generation digest, session-generation record and fifty-session limit.
-An existing cookie can be verified and revoked across both implementations without
-reseeding identities or replacing signing state. Native local credentials do not
+A cookie issued by the 0.7.x standalone console stays valid after the move to 0.8.0 and
+can be revoked, without reseeding identities or replacing signing state: the API uses the
+same session record format, which `npm run test:browser-auth` checks. Native local credentials do not
 merge with an Oathweave account by username or email. Reviewed product links retain
 their separate local account IDs.
 
-Set `CINDERTRACE_API_BROWSER_AUTH=true` on the retained console to delegate native
-local login, verification, logout and authenticated product requests to the API
-via verified HTTPS. It forwards only the local product cookie and exact Origin,
-without supplying a shared administrator bearer credential. Existing Hive OAuth
-sessions and their encrypted credential store retain their compatibility path.
-The legacy console and its default native recovery path remain until replacement
-and restored-data parity gates pass; this flag does not authorize a cutover.
+Sessions the retired console created through its own Hive OAuth sign-in are not
+accepted by the API; those users sign in again through HiveXUI.
+`CINDERTRACE_API_BROWSER_AUTH`, the console's switch for delegating to the API, has no
+effect in 0.8.0 and can be removed.
 
 Keep existing console security-event files and collector cursors. The API emits
 the same schemaVersion 1 `cindertrace_ui` authentication event format and keyed
@@ -102,6 +104,6 @@ bounded sessions and revocation can be checked using `npm run test:browser-auth`
 with `CINDERTRACE_AUTH_TEST_CONFIRM=isolated-synthetic-installation` and an explicit
 `CINDERTRACE_TEST_REDIS_URL` for a disposable fixture. The driver creates unique
 synthetic session/rate namespaces and cleans only those records. CI runs it in the
-`browser-auth` job against a disposable Redis service, and the lab job signs in
-through the API (`npm run init -- --lab` enables both flags above). Actual container,
-browser and restored-data acceptance remain required before production migration.
+`browser-auth` job against a disposable Redis service. The lab job signs in through
+HiveXUI and the gateway in a real browser (`npm run test:lab:browser`), and the
+standalone job's upgrade rehearsal keeps a session across an upgrade and revokes it.

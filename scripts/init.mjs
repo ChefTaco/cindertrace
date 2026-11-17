@@ -1,10 +1,10 @@
 import { randomBytes, createHash } from "node:crypto";
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, chmodSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { createRequire } from "node:module";
 const require = createRequire(
-  new URL("../apps/security-console/package.json", import.meta.url),
+  new URL("../services/security-fusion/package.json", import.meta.url),
 );
 const { hash } = require("argon2");
 const args = process.argv.slice(2);
@@ -20,6 +20,8 @@ if (existsSync(resolve(root, ".env")))
   );
 mkdirSync(resolve(root, "certs"), { recursive: true, mode: 0o700 });
 mkdirSync(resolve(root, "state"), { recursive: true, mode: 0o700 });
+// HiveXUI's static server runs as its own account and reads only this public file.
+mkdirSync(resolve(root, "ui"), { recursive: true, mode: 0o755 });
 const random = () => randomBytes(32).toString("hex");
 const password = random(),
   postgres = random(),
@@ -43,7 +45,7 @@ execFileSync(
     "-subj",
     "/CN=localhost",
     "-addext",
-    "subjectAltName=DNS:localhost,DNS:api,DNS:console,IP:127.0.0.1",
+    "subjectAltName=DNS:localhost,DNS:api,DNS:gateway,IP:127.0.0.1",
     "-keyout",
     resolve(root, "certs/server.key"),
     "-out",
@@ -56,7 +58,7 @@ const env = {
   CINDERTRACE_GID: String(process.getgid?.() ?? 1000),
   CINDERTRACE_STATE_DIR: "/state",
   CINDERTRACE_DATABASE_NAME: databaseName,
-  CINDERTRACE_CONSOLE_PORT: lab ? "3445" : "3444",
+  CINDERTRACE_UI_PORT: lab ? "3445" : "3444",
   POSTGRES_PASSWORD: postgres,
   DATABASE_URL: `postgresql://cindertrace:${postgres}@postgres:5432/${databaseName}`,
   REDIS_URL: "redis://redis:6379/0",
@@ -96,6 +98,8 @@ const env = {
       ],
     },
   }),
+  // The API owns local sign-in; HiveXUI signs in through the gateway at DASHBOARD_PUBLIC_ORIGIN.
+  CINDERTRACE_BROWSER_AUTH_ENABLED: "true",
   SECURITY_SUMMARY_TOKEN_SHA256: createHash("sha256")
     .update(random())
     .digest("hex"),
@@ -124,8 +128,6 @@ if (lab) {
     CINDERTRACE_LAB_ENABLED: "true", CINDERTRACE_LAB_INSTALLATION_ID: labId,
     CINDERTRACE_LAB_CONFIRM: "isolated-synthetic-installation", COMPOSE_PROJECT_NAME: `cindertrace-lab-${labId}`,
     SECURITY_INGEST_ENABLED: "false", SECURITY_NOTIFICATIONS_ENABLED: "false",
-    // The API owns local sign-in; the retained console only forwards to it.
-    CINDERTRACE_BROWSER_AUTH_ENABLED: "true", CINDERTRACE_API_BROWSER_AUTH: "true",
   });
   const agent = { readToken: random(), draftToken: random(), labControlToken: random() };
   Object.assign(env, {
@@ -142,6 +144,13 @@ writeFileSync(
     .join("\n") + "\n",
   { mode: 0o600, flag: "wx" },
 );
+// HiveXUI local mode: Cindertrace pages only, signed in by the API's own local sign-in.
+writeFileSync(
+  resolve(root, "ui/runtime.json"),
+  JSON.stringify({ schema: 1, mode: "local", products: { cindertrace: "/api/cindertrace" } }) + "\n",
+  { mode: 0o644, flag: "wx" },
+);
+chmodSync(resolve(root, "ui/runtime.json"), 0o644);
 writeFileSync(
   resolve(root, "state/initial-credentials.txt"),
   `Username: admin\nPassword: ${password}\n`,

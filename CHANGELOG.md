@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Removed
+
+- The standalone console (`apps/security-console`, the Next.js app) and everything that only served it: its workspace, image build stage and runtime files, the bundled JetBrains Mono font, its CI staging steps and the console-only `CINDERTRACE_API_BROWSER_AUTH` setting. HiveXUI is Cindertrace's only UI. The console's own Oathweave sign-in (`docs/OATHWEAVE_CONSOLE.md`) is gone; in a Hive suite, HiveXUI signs in through Oathweave.
+- Native systemd installations: the upgrade backend (`scripts/upgrade-native.mjs`, `--install`, `--archive`, `--sha256`), its runtime archive tooling (`npm run release:bundle`, `scripts/upgrade-artifacts.mjs`) and `examples/native-installation.json`. The upgrade command now upgrades Compose installations only.
+
+### Changed
+
+- Standalone and lab Compose installations serve HiveXUI in local mode at the same address (`https://localhost:3444`, lab `3445`). Two services replace `console`: `ui`, the HiveXUI 0.10.0 image pinned by digest (static files, internal only, read-only, its own unprivileged account), and `gateway`, `scripts/ui-gateway.mjs` from the Cindertrace image (read-only, no capabilities, no product secrets). The gateway terminates TLS, forwards `/api/cindertrace/*` to the API's `/api/v1/*` over verified HTTPS with only the `cindertrace_session` cookie, answers 404 for every other `/api/*` path, and serves everything else from HiveXUI. `npm run init` writes HiveXUI's `ui/runtime.json`, enables the API's local sign-in (`CINDERTRACE_BROWSER_AUTH_ENABLED=true`) for standalone installations too, and names the published port `CINDERTRACE_UI_PORT`.
+- The release layout is now 2. The upgrade command refuses an installation that still has the `console` service; move a 0.7.x installation by the steps in `docs/UPGRADING.md`. Local sessions created by the 0.7.x console stay valid.
+- The lab browser test (`npm run test:lab:browser`, CI `lab` job) drives HiveXUI through the gateway: wrong-password refusal, API sign-in and cookie, every Cindertrace page, all three lab stages, sign-out, and no request outside `/api/cindertrace/`. The upgrade rehearsal signs in through the gateway.
+
+No database migration is required.
+
 ## [0.7.2] - 2026-11-17
 
 ### Security

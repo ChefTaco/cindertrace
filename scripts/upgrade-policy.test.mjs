@@ -10,12 +10,9 @@ import {
   assertSafeState,
   assertMigrations,
   atomicPrivate,
-  unitName,
-  absolutePath,
   patchEnvironment,
   recoveryArchiveName,
   assertUpgradeNode,
-  upgradeChildEnvironment,
 } from "./upgrade-policy.mjs";
 test("environment round trip preserves escaped credentials and JSON without shell evaluation", () => {
   const value = {
@@ -67,7 +64,7 @@ test("migration retry accepts unchanged completed history and refuses drift or i
     assertMigrations([row], { [row.migration_name]: "b".repeat(64) }),
   );
 });
-test("private records are atomically replaced and service/path input cannot add shell operations", () => {
+test("private records are atomically replaced", () => {
   const root = mkdtempSync(join(tmpdir(), "cindertrace-upgrade-"));
   try {
     const file = join(root, "record");
@@ -75,8 +72,6 @@ test("private records are atomically replaced and service/path input cannot add 
     atomicPrivate(file, "second");
     assert.equal(readFileSync(file, "utf8"), "second");
     assert.equal(statSync(file).mode & 0o777, 0o600);
-    assert.throws(() => unitName("api.service; reboot"));
-    assert.throws(() => absolutePath("/opt/../etc"));
   } finally {
     rmSync(root, { recursive: true });
   }
@@ -101,28 +96,10 @@ test("upgrade archives use the supported off-host receiver name contract", () =>
   );
 });
 
-test("unsupported runtimes fail before native dependency activation", () => {
+test("unsupported runtimes fail before the upgrade starts", () => {
   for (const v of ["24.22.3", "24.23.0", "26.13.1", "26.14.0"]) assertUpgradeNode(v);
   for (const v of ["22.15.0", "24.22.0", "24.22.1", "24.22.2", "26.12.0", "26.13.0", "25.1.0"])
     assert.throws(() => assertUpgradeNode(v));
-});
-
-test("upgrade children cannot inherit loader or executable-path injection", () => {
-  const child = upgradeChildEnvironment({
-    NODE_OPTIONS: "--require /tmp/fixture.js",
-    LD_PRELOAD: "/tmp/fixture.so",
-    NODE_TLS_REJECT_UNAUTHORIZED: "0",
-    PATH: "/tmp",
-    DATABASE_URL: "postgresql://fixture:fixture@localhost/example",
-  });
-  assert(!("NODE_OPTIONS" in child));
-  assert(!("LD_PRELOAD" in child));
-  assert(!("NODE_TLS_REJECT_UNAUTHORIZED" in child));
-  assert.equal(child.PATH, "/usr/sbin:/usr/bin:/sbin:/bin");
-  assert.equal(
-    child.DATABASE_URL,
-    "postgresql://fixture:fixture@localhost/example",
-  );
 });
 
 test('lab schema release requires reviewed schema reconciliation before automatic rollback', () => {
