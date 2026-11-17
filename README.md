@@ -23,7 +23,7 @@ of HiveXUI; it stays until HiveXUI parity and restored-data acceptance pass (see
 
 Requirements: Node.js 24.22.3+ on the 24.x line or 26.13.1+ on the 26.x line, npm, OpenSSL, and Docker
 with Compose. From a clean checkout of a release tag, for example
-`git clone --branch v0.7.1 https://github.com/ChefTaco/cindertrace.git`:
+`git clone --branch v0.7.2 https://github.com/ChefTaco/cindertrace.git`:
 
 ```sh
 npm ci
@@ -50,14 +50,14 @@ See [installation](docs/INSTALLATION.md), [integrations](docs/INTEGRATIONS.md),
 [publication](docs/PUBLISHING.md).
 
 Releases from 0.2.0 on are published as the container image
-`ghcr.io/cheftaco/cindertrace`, tagged with the exact version (for example `0.7.1`) for
+`ghcr.io/cheftaco/cindertrace`, tagged with the exact version (for example `0.7.2`) for
 `linux/amd64` and `linux/arm64` with a build provenance attestation. Each
 [GitHub release](https://github.com/ChefTaco/cindertrace/releases) records the source
 commit, source tree and image digest; it has no downloadable assets. The Compose stack
 above builds the image locally from your checkout. In a Hive installation, the suite's
 `full` profile installs the published image through `hive.sh`, the
-[Hive suite controller](https://github.com/ChefTaco/hive#install-the-suite); Hive 3.11.0
-pins Cindertrace 0.7.1. Only the 0.1.0 release has a native runtime archive, SHA-256
+[Hive suite controller](https://github.com/ChefTaco/hive#install-the-suite); Hive 3.11.1
+pins Cindertrace 0.7.2. Only the 0.1.0 release has a native runtime archive, SHA-256
 checksum and publication review attached. For later releases, build the native archive
 yourself with `npm run release:bundle`, as the [upgrade runbook](docs/UPGRADING.md)
 describes.
