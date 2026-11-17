@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2] - 2026-11-17
+
+### Security
+
+- Update `next` to 16.4.6 for GHSA-mfr8-8qww-v76h. The standalone console is built with Next.js and is part of the runtime image.
+
+No database migration is required.
+
 ## [0.7.1] - 2026-11-15
 
 ### Changed
