@@ -7,7 +7,9 @@ These contracts contain no datastore, signing, filesystem or deployment code.
 
 After committing a reviewed change, run `npm run contracts:browser -- --output
 NEW_DIRECTORY` to export the exact immutable public contract blobs and their
-SHA-256 provenance. Existing directories are refused. Consumers vendor this
+SHA-256 provenance. The artifact holds `index.ts`, `lab.ts`, `browser-auth.ts`,
+`browser.ts` and `hive-audit.ts`, in that order; an import of any other module
+except `zod` is refused. Existing directories are refused. Consumers vendor this
 artifact, verify every digest, and import no sibling implementation files.
 
 The core integration test validates real API responses against these contracts,

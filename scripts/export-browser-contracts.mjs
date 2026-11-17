@@ -7,7 +7,8 @@ import {fileURLToPath} from 'node:url';
 export function exportBrowserContracts(root,output) {
  const git=args=>execFileSync('git',['--no-replace-objects',...args],{cwd:root});
  const revision=git(['rev-parse','--verify','HEAD^{commit}']).toString().trim();
- const names=['index.ts','lab.ts','browser-auth.ts','browser.ts'];
+ // Append new public modules so existing consumers keep their file order.
+ const names=['index.ts','lab.ts','browser-auth.ts','browser.ts','hive-audit.ts'];
  const files=names.map(path=>{const source='packages/contracts/src/'+path,bytes=git(['show',revision+':'+source]);
   for(const match of bytes.toString().matchAll(/from\s+['"]([^'"]+)['"]/gu))if(match[1]!=='zod'&&!names.some(name=>'./'+name.replace(/\.ts$/u,'.js')===match[1]))throw Error('Browser contract imports server implementation');
   return{path,source,bytes,sha256:createHash('sha256').update(bytes).digest('hex')};});

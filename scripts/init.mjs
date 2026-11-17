@@ -124,6 +124,8 @@ if (lab) {
     CINDERTRACE_LAB_ENABLED: "true", CINDERTRACE_LAB_INSTALLATION_ID: labId,
     CINDERTRACE_LAB_CONFIRM: "isolated-synthetic-installation", COMPOSE_PROJECT_NAME: `cindertrace-lab-${labId}`,
     SECURITY_INGEST_ENABLED: "false", SECURITY_NOTIFICATIONS_ENABLED: "false",
+    // The API owns local sign-in; the retained console only forwards to it.
+    CINDERTRACE_BROWSER_AUTH_ENABLED: "true", CINDERTRACE_API_BROWSER_AUTH: "true",
   });
   const agent = { readToken: random(), draftToken: random(), labControlToken: random() };
   Object.assign(env, {

@@ -1,6 +1,6 @@
 // Disposable browser acceptance. Credentials and captures never enter Git.
 import assert from 'node:assert/strict';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { createRequire } from 'node:module';
 import { readEnvironment } from './upgrade-policy.mjs';
@@ -20,6 +20,14 @@ if (output) {
   assert(isAbsolute(output) && (fromSource.startsWith('..') || isAbsolute(fromSource)), 'Browser captures must be outside the repository');
   mkdirSync(output, {recursive: true, mode: 0o700});
 }
+// API-owned sign-in: the console forwards credentials and the API issues the session.
+const apiSignIn = env.CINDERTRACE_API_BROWSER_AUTH === 'true';
+if (process.env.CINDERTRACE_LAB_BROWSER_REQUIRE_API_SIGNIN === 'true') assert(apiSignIn, 'Lab must delegate sign-in to the API');
+if (apiSignIn) assert.equal(env.CINDERTRACE_BROWSER_AUTH_ENABLED, 'true');
+const auditDir = env.AUDIT_LOG_DIR?.startsWith('/state/') ? resolve(installation, 'state', env.AUDIT_LOG_DIR.slice('/state/'.length)) : undefined;
+const apiSignIns = () => !auditDir || !existsSync(auditDir) ? 0 : readdirSync(auditDir).filter(name => name.endsWith('.jsonl'))
+  .flatMap(name => readFileSync(resolve(auditDir, name), 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)))
+  .filter(entry => entry.action === 'auth.login_succeeded' && entry.targetType === 'browser-session').length;
 const password = readFileSync(resolve(installation, 'state/initial-credentials.txt'), 'utf8').match(/^Password: (.+)$/m)?.[1];
 assert(password);
 const browser = await chromium.launch();
@@ -46,11 +54,18 @@ const write = async (confidence, rationale) => {
   await page.getByRole('textbox', {name: 'Freeform reasoning · unscored'}).fill(rationale);
 };
 try {
+  const signInsBefore = apiSignIns();
   await page.goto(origin + '/login');
   await page.getByRole('textbox', {name: 'Username', exact: true}).fill('admin');
   await page.getByRole('textbox', {name: 'Password', exact: true}).fill(password);
   await page.getByRole('button', {name: 'Sign In', exact: true}).click();
   await page.waitForURL('**/security-fusion');
+  if (apiSignIn) {
+    assert(auditDir, 'API audit directory must be inside the installation state');
+    assert.equal(apiSignIns(), signInsBefore + 1, 'The API did not record the sign-in');
+    const cookie = (await context.cookies(origin)).find(entry => entry.name === 'cindertrace_session');
+    assert(cookie?.httpOnly && cookie.secure && cookie.sameSite === 'Lax', 'API session cookie missing');
+  }
   await page.getByRole('link', {name: 'Lab', exact: true}).click();
   await expect(page.getByRole('button', {name: 'Start investigation', exact: true})).toBeVisible();
   await page.getByRole('button', {name: 'Start investigation', exact: true}).click();
@@ -122,5 +137,5 @@ try {
   await expect(page.getByRole('link').filter({hasText: 'completed · stage 3/3'}).first()).toBeVisible();
   await page.goto(caseUrl); await expect(comparison).toBeVisible();
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({browserLab: 'passed', stages: 3, revisions: 3, confidence: [65,20,90], humanSimulationDecisions: 2, preservation: true, reloadPersistence: true, desktopAndMobile: true}));
+  console.log(JSON.stringify({browserLab: 'passed', signIn: apiSignIn ? 'api' : 'console', stages: 3, revisions: 3, confidence: [65,20,90], humanSimulationDecisions: 2, preservation: true, reloadPersistence: true, desktopAndMobile: true}));
 } finally { await browser.close(); }
