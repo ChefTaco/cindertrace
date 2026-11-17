@@ -101,5 +101,7 @@ Run unit/build/contract/privacy gates with `npm run verify`. Native Redis adopti
 bounded sessions and revocation can be checked using `npm run test:browser-auth`
 with `CINDERTRACE_AUTH_TEST_CONFIRM=isolated-synthetic-installation` and an explicit
 `CINDERTRACE_TEST_REDIS_URL` for a disposable fixture. The driver creates unique
-synthetic session/rate namespaces and cleans only those records. Actual container,
+synthetic session/rate namespaces and cleans only those records. CI runs it in the
+`browser-auth` job against a disposable Redis service, and the lab job signs in
+through the API (`npm run init -- --lab` enables both flags above). Actual container,
 browser and restored-data acceptance remain required before production migration.

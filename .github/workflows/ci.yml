@@ -57,6 +57,34 @@ jobs:
         if: always()
         run: docker compose down
 
+  browser-auth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:8.10.3-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-retries 20
+    env:
+      CINDERTRACE_AUTH_TEST_CONFIRM: isolated-synthetic-installation
+      CINDERTRACE_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '24.22.3'
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @cindertrace/contracts -w @cindertrace/integrations -w @cindertrace/api
+      - run: npm run test:browser-auth
+      - name: Confirm the fixture removed its records
+        run: test "$(docker exec "${{ job.services.redis.id }}" redis-cli dbsize)" = 0
+
   lab:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -76,7 +104,7 @@ jobs:
           docker compose exec -T -e CINDERTRACE_LAB_RECOVERY_TEST=true api node -e
           'process.env.CINDERTRACE_TEST_DATABASE_URL=process.env.DATABASE_URL.replace(/\/[^/]+$/,"/cindertrace_test_lab_ci");import("./scripts/lab-integration.mjs")'
       - run: npm exec -w @cindertrace/console -- playwright install --with-deps chromium
-      - run: CINDERTRACE_LAB_BROWSER_TEST_CONFIRM=disposable-installation npm run test:lab:browser
+      - run: CINDERTRACE_LAB_BROWSER_TEST_CONFIRM=disposable-installation CINDERTRACE_LAB_BROWSER_REQUIRE_API_SIGNIN=true npm run test:lab:browser
       - name: Stop disposable lab
         if: always()
         run: npm run lab -- stop

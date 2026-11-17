@@ -6,7 +6,12 @@ an operational environment into it. Initialization refuses existing configuratio
 The normal demo and normal installation remain available without lab mode.
 
 The console runs at `https://localhost:3445`. Use the generated local administrator
-credentials to start a run. Operators can investigate, save revisions and advance.
+credentials to start a run. A new lab signs in through the API: initialization sets
+`CINDERTRACE_BROWSER_AUTH_ENABLED=true` for the API and `CINDERTRACE_API_BROWSER_AUTH=true`
+for the console, which forwards the credentials and the `cindertrace_session` cookie
+(see [browser authentication](BROWSER_AUTH.md)). The API uses the generated
+`DASHBOARD_ADMIN_PASSWORD_HASH_B64`, `SESSION_SECRET`, `REDIS_URL` and
+`DASHBOARD_PUBLIC_ORIGIN`. Labs initialized earlier keep console sign-in. Operators can investigate, save revisions and advance.
 Only administrators can start/restart runs or decide simulated containment.
 
 ## Investigator workflow
@@ -97,5 +102,8 @@ CINDERTRACE_LAB_BROWSER_TEST_CONFIRM=disposable-installation npm run test:lab:br
 ```
 
 Set `CINDERTRACE_LAB_BROWSER_INSTALLATION` to the separate installation directory
-when running from a development checkout. Optional `CINDERTRACE_LAB_BROWSER_OUTPUT`
+when running from a development checkout. When the lab delegates sign-in, the test
+also checks that the API recorded the sign-in in its audit log and set the session
+cookie; `CINDERTRACE_LAB_BROWSER_REQUIRE_API_SIGNIN=true` (set in CI) fails a lab
+that does not delegate. Optional `CINDERTRACE_LAB_BROWSER_OUTPUT`
 requires an absolute directory outside the repository for synthetic captures.
