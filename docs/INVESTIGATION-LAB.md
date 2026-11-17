@@ -5,14 +5,17 @@ releases. Use a fresh separate checkout and `npm run init -- --lab`; never copy
 an operational environment into it. Initialization refuses existing configuration.
 The normal demo and normal installation remain available without lab mode.
 
-The console runs at `https://localhost:3445`. Use the generated local administrator
-credentials to start a run. A new lab signs in through the API: initialization sets
-`CINDERTRACE_BROWSER_AUTH_ENABLED=true` for the API and `CINDERTRACE_API_BROWSER_AUTH=true`
-for the console, which forwards the credentials and the `cindertrace_session` cookie
-(see [browser authentication](BROWSER_AUTH.md)). The API uses the generated
+The lab's UI is HiveXUI in local mode at `https://localhost:3445/security-fusion/lab`,
+served by the same `ui` and gateway services as a standalone installation
+([installation](INSTALLATION.md#the-ui-hivexui-in-local-mode)). Sign in with the
+generated local administrator credentials; the API owns the sign-in
+(`CINDERTRACE_BROWSER_AUTH_ENABLED=true`, with the generated
 `DASHBOARD_ADMIN_PASSWORD_HASH_B64`, `SESSION_SECRET`, `REDIS_URL` and
-`DASHBOARD_PUBLIC_ORIGIN`. Labs initialized earlier keep console sign-in. Operators can investigate, save revisions and advance.
-Only administrators can start/restart runs or decide simulated containment.
+`DASHBOARD_PUBLIC_ORIGIN`; see [browser authentication](BROWSER_AUTH.md)). Local mode
+needs no Oathweave, Hive or Magnus setting, which lab isolation forbids. Labs initialized
+before 0.8.0 ran the retired console; initialize a new lab instead of upgrading one.
+Operators can investigate, save revisions and advance. Only administrators can
+start/restart runs or decide simulated containment.
 
 ## Investigator workflow
 
@@ -41,8 +44,8 @@ each revision was saved, rather than hindsight from the completed scenario.
 Use `CindertraceClient` from `@cindertrace/integrations` on the server. Configure
 its HTTPS API origin, read token, independent draft token and independent
 `labControlToken`. In the disposable Compose installation the internal origin is
-`https://api:4101`; external clients must use an explicitly configured TLS endpoint
-or an authorized same-origin session proxy. The API is not publicly bound by default.
+`https://api:4101`; external clients must use an explicitly configured TLS endpoint.
+The browser reaches the API only through the gateway's `/api/cindertrace/*`. The API is not publicly bound by default.
 Generated plaintext tokens are only in `state/lab-agent-credentials.json`; their
 server registrations are SHA-256 digests in the lab environment. Do not expose
 those tokens to browser code or commit them.
@@ -64,7 +67,7 @@ those tokens to browser code or commit them.
 
 The `/api/v1/security-fusion/lab` HTTP operations are described in
 [OpenAPI](openapi.json). Browser operations use the authenticated same-origin
-proxy. Agent read/draft/control credentials cannot approve simulated or real
+gateway with the browser's session cookie. Agent read/draft/control credentials cannot approve simulated or real
 containment. The control token cannot start runs or access normal response routes.
 
 ## Approval simulation and isolation
@@ -93,17 +96,19 @@ proof belong outside Git. Public fixtures and screenshots must remain synthetic.
 
 Run `npm run verify` before committing. The dedicated CI lab job initializes a
 fresh installation, exercises real database/agent boundaries and restore recovery,
-and runs browser acceptance. To run browser acceptance locally against a disposable
-lab with no active investigation:
+and runs browser acceptance against HiveXUI in local mode. To run browser acceptance
+locally against a disposable lab with no active investigation:
 
 ```sh
-npm exec -w @cindertrace/console -- playwright install chromium
+npx playwright install chromium
 CINDERTRACE_LAB_BROWSER_TEST_CONFIRM=disposable-installation npm run test:lab:browser
 ```
 
 Set `CINDERTRACE_LAB_BROWSER_INSTALLATION` to the separate installation directory
-when running from a development checkout. When the lab delegates sign-in, the test
-also checks that the API recorded the sign-in in its audit log and set the session
-cookie; `CINDERTRACE_LAB_BROWSER_REQUIRE_API_SIGNIN=true` (set in CI) fails a lab
-that does not delegate. Optional `CINDERTRACE_LAB_BROWSER_OUTPUT`
-requires an absolute directory outside the repository for synthetic captures.
+when running from a development checkout. The test refuses a wrong password, signs in,
+checks that the API recorded the sign-in in its audit log and set its Secure, HttpOnly,
+SameSite=Lax `cindertrace_session` cookie with nothing credential-like in browser
+storage, opens every Cindertrace page, runs all three lab stages, signs out, and checks
+that HiveXUI called nothing outside `/api/cindertrace/`. Optional
+`CINDERTRACE_LAB_BROWSER_OUTPUT` requires an absolute directory outside the repository
+for synthetic captures.

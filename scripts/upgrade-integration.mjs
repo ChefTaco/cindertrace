@@ -52,7 +52,7 @@ async function run(
 const dc = (...args) => run(["docker", "compose", ...args]);
 const command = (...args) =>
   run([process.execPath, join(source, "scripts/upgrade.mjs"), ...args]);
-function consoleRequest(path, { method = "GET", cookie, body } = {}) {
+function uiRequest(path, { method = "GET", cookie, body } = {}) {
   return new Promise((done, reject) => {
     const req = https.request("https://localhost:35444" + path, {
       method,
@@ -111,14 +111,14 @@ try {
   writeFileSync(join(fixture, ".env"), renderEnvironment(env), { mode: 0o600 });
   writeFileSync(
     join(fixture, "compose.override.yaml"),
-    'services:\n  console:\n    ports: !override ["127.0.0.1:35444:3444"]\n',
+    'services:\n  gateway:\n    ports: !override ["127.0.0.1:35444:3444"]\n',
   );
   console.log("Starting isolated upgrade fixture");
   await dc("up", "-d", "--no-build", "--wait", "--wait-timeout", "120");
   started = true;
   const password = readFileSync(join(fixture, "state/initial-credentials.txt"), "utf8")
     .match(/^Password: (.+)$/m)[1];
-  const login = await consoleRequest("/api/auth/login", {
+  const login = await uiRequest("/api/cindertrace/auth/local/login", {
     method: "POST", body: { username: "admin", password },
   });
   assert.equal(login.status, 200);
@@ -149,7 +149,7 @@ try {
   const proof = JSON.parse(readFileSync(join(fixture, ".cindertrace/upgrades", planned.id, "record.json")));
   assert(proof.restoreVerification);
   assert(proof.integrityVerification.evidenceVerified > 0);
-  assert.equal((await consoleRequest("/api/auth/me", { cookie })).status, 200);
+  assert.equal((await uiRequest("/api/cindertrace/auth/local/session", { cookie })).status, 200);
   const noStaleRollback = await run(
     [
       process.execPath,
@@ -264,9 +264,9 @@ try {
     "import {getDb,disconnectDb} from './services/security-fusion/dist/db/index.js';const d=getDb();const rows=await d.securityFusionEvidence.findMany();if(!rows.length||rows.some(x=>x.integrityStatus.startsWith('quarantined')))throw Error('Evidence lost');console.log(JSON.stringify({evidence:rows.length,migrations:Number((await d.$queryRaw`SELECT count(*)::int n FROM _prisma_migrations WHERE migration_name='20261104000000_upgrade_rehearsal'`)[0].n)}));await disconnectDb();",
   );
   assert.equal(JSON.parse(read.output.trim().split("\n").at(-1)).migrations, 1);
-  assert.equal((await consoleRequest("/api/auth/me", { cookie })).status, 200);
-  assert.equal((await consoleRequest("/api/auth/logout", { method: "POST", cookie })).status, 200);
-  assert.equal((await consoleRequest("/api/auth/me", { cookie })).status, 401);
+  assert.equal((await uiRequest("/api/cindertrace/auth/local/session", { cookie })).status, 200);
+  assert.equal((await uiRequest("/api/cindertrace/auth/local/logout", { method: "POST", cookie })).status, 200);
+  assert.equal((await uiRequest("/api/cindertrace/auth/local/session", { cookie })).status, 401);
   success = true;
   console.log(
     JSON.stringify({

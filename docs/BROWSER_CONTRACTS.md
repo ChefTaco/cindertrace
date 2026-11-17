@@ -1,7 +1,7 @@
 # Browser contracts
 
 `packages/contracts` owns the public Zod request schemas and browser response
-schemas. Its `browser` export maps the exact console routes and their response
+schemas. Its `browser` export maps the exact browser routes HiveXUI uses and their response
 envelopes; OpenAPI response schemas are generated from the same definitions.
 These contracts contain no datastore, signing, filesystem or deployment code.
 

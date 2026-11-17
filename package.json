@@ -9,12 +9,11 @@
     "node": "^24.22.3 || ^26.13.1"
   },
   "workspaces": [
-    "apps/*",
     "services/*",
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @cindertrace/contracts -w @cindertrace/integrations -w @cindertrace/api -w @cindertrace/collector -w @cindertrace/console",
+    "build": "npm run build -w @cindertrace/contracts -w @cindertrace/integrations -w @cindertrace/api -w @cindertrace/collector",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && node --test scripts/*.test.mjs",
     "db:generate": "npm run db:generate -w @cindertrace/api",
@@ -29,7 +28,6 @@
     "test:recovery": "node scripts/recovery-integration.mjs",
     "demo": "node scripts/demo.mjs",
     "upgrade": "node scripts/upgrade.mjs",
-    "release:bundle": "node scripts/bundle-runtime.mjs",
     "test:upgrade": "CINDERTRACE_UPGRADE_TEST_CONFIRM=disposable-installation node scripts/upgrade-integration.mjs",
     "tools:check": "node scripts/check-tool-identifiers.mjs",
     "lab": "node scripts/lab.mjs",
@@ -40,6 +38,7 @@
     "contracts:browser": "node scripts/export-browser-contracts.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "typescript": "6.0.3",
     "vitest": "4.1.12",
     "yaml": "2.9.1",

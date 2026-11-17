@@ -1,17 +1,17 @@
-// Disposable browser acceptance. Credentials and captures never enter Git.
+// Disposable browser acceptance of HiveXUI in local mode. Credentials and captures never enter Git.
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
-import { createRequire } from 'node:module';
+import { chromium, expect } from '@playwright/test';
 import { readEnvironment } from './upgrade-policy.mjs';
-const require = createRequire(new URL('../apps/security-console/package.json', import.meta.url));
-const {chromium, expect} = require('@playwright/test');
 assert.equal(process.env.CINDERTRACE_LAB_BROWSER_TEST_CONFIRM, 'disposable-installation');
 const installation = resolve(process.env.CINDERTRACE_LAB_BROWSER_INSTALLATION ?? '.');
 const env = readEnvironment(readFileSync(resolve(installation, '.env'), 'utf8'));
 assert.equal(env.CINDERTRACE_LAB_ENABLED, 'true');
 assert.equal(env.CINDERTRACE_LAB_CONFIRM, 'isolated-synthetic-installation');
 assert.equal(env.COMPOSE_PROJECT_NAME, `cindertrace-lab-${env.CINDERTRACE_LAB_INSTALLATION_ID}`);
+// HiveXUI signs in with the API's own local sign-in, so the API must offer it.
+assert.equal(env.CINDERTRACE_BROWSER_AUTH_ENABLED, 'true', 'The lab API must own local sign-in');
 const origin = env.DASHBOARD_PUBLIC_ORIGIN;
 assert.equal(new URL(origin).hostname, 'localhost');
 const output = process.env.CINDERTRACE_LAB_BROWSER_OUTPUT;
@@ -20,53 +20,65 @@ if (output) {
   assert(isAbsolute(output) && (fromSource.startsWith('..') || isAbsolute(fromSource)), 'Browser captures must be outside the repository');
   mkdirSync(output, {recursive: true, mode: 0o700});
 }
-// API-owned sign-in: the console forwards credentials and the API issues the session.
-const apiSignIn = env.CINDERTRACE_API_BROWSER_AUTH === 'true';
-if (process.env.CINDERTRACE_LAB_BROWSER_REQUIRE_API_SIGNIN === 'true') assert(apiSignIn, 'Lab must delegate sign-in to the API');
-if (apiSignIn) assert.equal(env.CINDERTRACE_BROWSER_AUTH_ENABLED, 'true');
 const auditDir = env.AUDIT_LOG_DIR?.startsWith('/state/') ? resolve(installation, 'state', env.AUDIT_LOG_DIR.slice('/state/'.length)) : undefined;
-const apiSignIns = () => !auditDir || !existsSync(auditDir) ? 0 : readdirSync(auditDir).filter(name => name.endsWith('.jsonl'))
+const apiAudit = () => !auditDir || !existsSync(auditDir) ? [] : readdirSync(auditDir).filter(name => name.endsWith('.jsonl'))
   .flatMap(name => readFileSync(resolve(auditDir, name), 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)))
-  .filter(entry => entry.action === 'auth.login_succeeded' && entry.targetType === 'browser-session').length;
+  .filter(entry => entry.targetType === 'browser-session');
+const count = action => apiAudit().filter(entry => entry.action === action).length;
 const password = readFileSync(resolve(installation, 'state/initial-credentials.txt'), 'utf8').match(/^Password: (.+)$/m)?.[1];
 assert(password);
 const browser = await chromium.launch();
 const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 1440, height: 1000}});
 const page = await context.newPage();
-const errors = [];
+const errors = [], requests = [];
 page.on('pageerror', error => errors.push(error.name));
+page.on('request', request => { const url = new URL(request.url()); if (url.pathname.startsWith('/api/')) requests.push(url.pathname); });
+const signInScreen = page.getByRole('heading', {name: 'Cindertrace sign-in', exact: true});
+const form = page.locator('form.login-card');
 const save = async revision => {
   await page.getByRole('button', {name: 'Save investigation revision', exact: true}).click();
   await expect(page.getByRole('heading', {name: `Revision ${revision + 1} · what do you believe now?`, exact: true})).toBeVisible();
 };
+// A label wrapping a select also names it with the selected option, so match the label's start.
+const startsWith = text => new RegExp('^' + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+const select = label => page.getByRole('combobox', {name: startsWith(label)});
 const claim = async (label, disposition, evidence = []) => {
-  const select = page.getByRole('combobox', {name: label, exact: true});
-  await select.selectOption(disposition);
-  const group = select.locator('xpath=../..');
+  const box = select(label);
+  await box.selectOption(disposition);
+  const group = box.locator('xpath=../..');
   for (const number of evidence) await group.getByRole('checkbox', {name: new RegExp(`^E${number} ·`)}).check();
 };
 const write = async (confidence, rationale) => {
   const slider = page.getByRole('slider'); await slider.focus(); await slider.press('Home');
   for (let n = 0; n < confidence; n++) await slider.press('ArrowRight');
-  await page.getByRole('textbox', {name: 'Hypotheses (one per line)'}).fill('Credential abuse or expected automation; revise using current evidence.');
+  await page.getByRole('textbox', {name: startsWith('Hypotheses')}).fill('Credential abuse or expected automation; revise using current evidence.');
   await page.getByRole('textbox', {name: 'Why this confidence? What changed?'}).fill(rationale);
-  await page.getByRole('textbox', {name: 'Prioritized next checks (one per line)'}).fill('Check the current evidence and scope the affected account.');
+  await page.getByRole('textbox', {name: startsWith('Prioritized next checks')}).fill('Check the current evidence and scope the affected account.');
   await page.getByRole('textbox', {name: 'Freeform reasoning · unscored'}).fill(rationale);
 };
 try {
-  const signInsBefore = apiSignIns();
-  await page.goto(origin + '/login');
-  await page.getByRole('textbox', {name: 'Username', exact: true}).fill('admin');
-  await page.getByRole('textbox', {name: 'Password', exact: true}).fill(password);
-  await page.getByRole('button', {name: 'Sign In', exact: true}).click();
+  assert(auditDir, 'API audit directory must be inside the installation state');
+  const signInsBefore = count('auth.login_succeeded');
+  await page.goto(origin + '/');
+  await expect(signInScreen).toBeVisible();
+  await form.getByLabel('Username').fill('admin');
+  await form.getByRole('textbox', {name: 'Password'}).fill('not-the-password');
+  await form.getByRole('button', {name: 'Sign in', exact: true}).click();
+  await expect(form.getByRole('alert')).toBeVisible();
+  await form.getByRole('textbox', {name: 'Password'}).fill(password);
+  await form.getByRole('button', {name: 'Sign in', exact: true}).click();
+  await expect(page.getByRole('navigation', {name: 'Cindertrace', exact: true})).toBeVisible();
   await page.waitForURL('**/security-fusion');
-  if (apiSignIn) {
-    assert(auditDir, 'API audit directory must be inside the installation state');
-    assert.equal(apiSignIns(), signInsBefore + 1, 'The API did not record the sign-in');
-    const cookie = (await context.cookies(origin)).find(entry => entry.name === 'cindertrace_session');
-    assert(cookie?.httpOnly && cookie.secure && cookie.sameSite === 'Lax', 'API session cookie missing');
+  assert.equal(count('auth.login_succeeded'), signInsBefore + 1, 'The API did not record the sign-in');
+  const cookie = (await context.cookies(origin)).find(entry => entry.name === 'cindertrace_session');
+  assert(cookie?.httpOnly && cookie.secure && cookie.sameSite === 'Lax', 'API session cookie missing');
+  const storage = await page.evaluate(() => JSON.stringify({...localStorage, ...sessionStorage}));
+  assert(!storage.includes(cookie.value) && !storage.includes(password), 'Credential in browser storage');
+  for (const name of ['Cases', 'Events', 'Entities', 'Sources', 'Evidence', 'Policies', 'Security audit']) {
+    await page.getByRole('navigation', {name: 'Cindertrace', exact: true}).getByRole('button', {name, exact: true}).click();
+    await expect(page.locator('.error-banner')).toHaveCount(0);
   }
-  await page.getByRole('link', {name: 'Lab', exact: true}).click();
+  await page.goto(origin + '/security-fusion/lab');
   await expect(page.getByRole('button', {name: 'Start investigation', exact: true})).toBeVisible();
   await page.getByRole('button', {name: 'Start investigation', exact: true}).click();
   await expect(page.getByRole('heading', {name: 'Suspicious login', exact: true})).toBeVisible();
@@ -78,8 +90,8 @@ try {
   await expect(page.getByRole('heading', {name: 'Revision 1 · what do you believe now?', exact: true})).toBeVisible();
   await write(65, 'Failures raise suspicion but do not establish successful compromise.');
   await claim('The application account is compromised', 'asserted', [1]);
-  await page.getByRole('combobox', {name: 'Recommendation', exact: true}).selectOption('host_isolation');
-  await page.getByRole('combobox', {name: 'Target', exact: true}).selectOption({label: 'host · app-1.example.com'});
+  await select('Recommendation').selectOption('host_isolation');
+  await select('Target').selectOption({label: 'host · app-1.example.com'});
   await page.getByRole('group', {name: 'Evidence supporting containment'}).getByRole('checkbox').first().check();
   await save(1);
   await expect(page.getByRole('button', {name: 'Approve simulation', exact: true})).toBeDisabled();
@@ -98,8 +110,8 @@ try {
   await expect(page.getByRole('heading', {name: 'Corroborating activity', exact: true})).toBeVisible();
   await write(90, 'The separate successful session, unauthorized grant and outbound activity now corroborate compromise.');
   await claim('The application account is compromised', 'asserted', [3, 4]);
-  await page.getByRole('combobox', {name: 'Recommendation', exact: true}).selectOption('host_isolation');
-  await page.getByRole('combobox', {name: 'Target', exact: true}).selectOption({label: 'host · app-1.example.com'});
+  await select('Recommendation').selectOption('host_isolation');
+  await select('Target').selectOption({label: 'host · app-1.example.com'});
   const containment = page.getByRole('group', {name: 'Evidence supporting containment'});
   for (const n of [3,4,5]) await containment.getByRole('checkbox', {name: new RegExp(`^E${n} ·`)}).check();
   await page.getByRole('textbox', {name: 'Containment rationale', exact: true}).fill('Review scoped host isolation based on the separate unauthorized session.');
@@ -136,6 +148,12 @@ try {
   await page.goto(origin + '/security-fusion/lab');
   await expect(page.getByRole('link').filter({hasText: 'completed · stage 3/3'}).first()).toBeVisible();
   await page.goto(caseUrl); await expect(comparison).toBeVisible();
+  await page.setViewportSize({width: 1440, height: 1000});
+  await page.getByRole('button', {name: 'Sign out', exact: true}).click();
+  await expect(signInScreen).toBeVisible();
+  await page.goto(origin + '/security-fusion/cases');
+  await expect(signInScreen).toBeVisible();
+  assert.deepEqual(requests.filter(path => !path.startsWith('/api/cindertrace/')), [], 'HiveXUI called something other than Cindertrace');
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({browserLab: 'passed', signIn: apiSignIn ? 'api' : 'console', stages: 3, revisions: 3, confidence: [65,20,90], humanSimulationDecisions: 2, preservation: true, reloadPersistence: true, desktopAndMobile: true}));
+  console.log(JSON.stringify({browserLab: 'passed', ui: 'hivexui-local', signIn: 'api', signOut: true, pages: 8, stages: 3, revisions: 3, confidence: [65,20,90], humanSimulationDecisions: 2, preservation: true, reloadPersistence: true, desktopAndMobile: true}));
 } finally { await browser.close(); }

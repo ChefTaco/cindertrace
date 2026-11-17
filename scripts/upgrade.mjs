@@ -8,24 +8,20 @@ import {
   closeSync,
   unlinkSync,
   existsSync,
-  realpathSync,
   appendFileSync,
 } from "node:fs";
 import { resolve, join } from "node:path";
 import { spawn } from "node:child_process";
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   assertSafeState,
   assertMigrations,
   atomicPrivate,
   readEnvironment,
-  renderEnvironment,
-  pausedEnvironment,
   assertUpgradeNode,
 } from "./upgrade-policy.mjs";
-import { NativeInstallation } from "./upgrade-native.mjs";
 import { ComposeInstallation } from "./upgrade-compose.mjs";
-const help = `Usage: node scripts/upgrade.mjs upgrade --to COMMIT [--project-dir DIR] [--install PRIVATE_NATIVE_MANIFEST --archive FILE --sha256 DIGEST]\n       node scripts/upgrade.mjs status|resume|rollback --id ID [--project-dir DIR | --install MANIFEST] [--retain-current-state]\nA pinned 40-character public commit is required. Native archives must be from that exact verified revision.\nNo database restore or uncertain command redispatch occurs during rollback.`;
+const help = `Usage: node scripts/upgrade.mjs upgrade --to COMMIT [--project-dir DIR] [--dry-run]\n       node scripts/upgrade.mjs status|resume|rollback --id ID [--project-dir DIR] [--retain-current-state]\nUpgrades a Compose installation. A pinned 40-character public commit is required.\nNo database restore or uncertain command redispatch occurs during rollback.`;
 function options(argv) {
   const out = { mode: "upgrade", projectDir: process.cwd() };
   if (argv[0] && !argv[0].startsWith("--")) out.mode = argv.shift();
@@ -47,9 +43,6 @@ function options(argv) {
       "--to": "revision",
       "--id": "id",
       "--project-dir": "projectDir",
-      "--install": "install",
-      "--archive": "archive",
-      "--sha256": "sha256",
     };
     assert(
       keys[key] && argv[i + 1] && !argv[i + 1].startsWith("--"),
@@ -127,10 +120,8 @@ try {
       if (input !== undefined) child.stdin.end(input);
       else child.stdin.end();
     });
-  backend = opts.install
-    ? new NativeInstallation(resolve(opts.install), run)
-    : new ComposeInstallation(project, run);
-  const root = opts.install ? backend.config.recordRoot : backend.recordRoot;
+  backend = new ComposeInstallation(project, run);
+  const root = backend.recordRoot;
   mkdirSync(root, { recursive: true, mode: 0o700 });
   const id = opts.mode === "upgrade" ? randomUUID() : opts.id;
   directory = join(root, id);
@@ -174,7 +165,7 @@ try {
       schemaVersion: 1,
       id,
       directory,
-      backend: opts.install ? "native" : "compose",
+      backend: "compose",
       revision: opts.revision,
       startedAt: new Date().toISOString(),
       phase: "preflight",
@@ -191,7 +182,8 @@ try {
     const manifest = await backend.prepare(opts, record);
     assert.equal(manifest.schemaVersion, 1);
     assert.equal(manifest.product, "cindertrace");
-    assert.equal(manifest.layoutVersion, 1);
+    // Layout 2: HiveXUI through the gateway; the standalone console is gone (docs/UPGRADING.md).
+    assert.equal(manifest.layoutVersion, 2, "This release needs its own installation migration");
     assertMigrations(initial.migrations, manifest.migrations);
     record.release = manifest;
     save("prepared");
@@ -211,37 +203,22 @@ try {
     }
   } else {
     record = JSON.parse(readFileSync(join(directory, "record.json")));
-    assert.equal(record.backend, opts.install ? "native" : "compose");
+    assert.equal(record.backend, "compose", "Native installations are no longer supported");
     assert.equal(record.directory, directory);
-    if (record.backend === "native") {
-      assert.deepEqual(
-        backend.config,
-        record.installation,
-        "Installation manifest changed",
-      );
-      backend.candidate = record.candidateRuntime;
-      backend.oldRuntime = record.previousRuntime;
-      backend.originalEnv = record.previousEnvironment;
-      backend.env = readEnvironment(record.previousEnvironment.api);
-    } else {
-      backend.project = record.project;
-      backend.image = record.image;
-      backend.oldImage = record.previousImage;
-      backend.originalEnv = record.previousEnvironment;
-      backend.env = readEnvironment(record.previousEnvironment);
-      backend.beforeFile = record.beforeFile;
-      backend.before = JSON.parse(readFileSync(record.beforeFile));
-      backend.stateHost = backend.hostPath(
-        "api",
-        backend.before.services.api.environment.CINDERTRACE_STATE_DIR ??
-          "/state",
-      );
-    }
+    backend.project = record.project;
+    backend.image = record.image;
+    backend.oldImage = record.previousImage;
+    backend.originalEnv = record.previousEnvironment;
+    backend.env = readEnvironment(record.previousEnvironment);
+    backend.beforeFile = record.beforeFile;
+    backend.before = JSON.parse(readFileSync(record.beforeFile));
+    backend.stateHost = backend.hostPath(
+      "api",
+      backend.before.services.api.environment.CINDERTRACE_STATE_DIR ??
+        "/state",
+    );
     if (opts.mode === "rollback") {
-      assert(
-        record.links || record.beforeFile,
-        "No activation state to roll back",
-      );
+      assert(record.beforeFile, "No activation state to roll back");
       assert(
         record.release?.rollbackCompatible === true,
         "This release requires a reviewed application/schema reconciliation",
@@ -251,19 +228,7 @@ try {
           opts.retain,
           "New writes may exist; review current state and pass --retain-current-state for code-only rollback",
         );
-      const current = await (backend.inspect
-        ? backend.inspect()
-        : backend
-            .node(
-              backend.candidate ?? backend.oldRuntime,
-              ["--input-type=module", "-"],
-              backend.env,
-              readFileSync(
-                new URL("./upgrade-probe.mjs", import.meta.url),
-                "utf8",
-              ),
-            )
-            .then(JSON.parse));
+      const current = await backend.inspect();
       assertSafeState(current.state);
       assertMigrations(current.migrations, record.release.migrations);
       assertMigrations(
@@ -297,16 +262,7 @@ try {
   }
   await backend.pause(record);
   save("paused");
-  const frozen = backend.inspect
-    ? await backend.inspect()
-    : JSON.parse(
-        await backend.node(
-          backend.oldRuntime,
-          ["--input-type=module", "-"],
-          backend.env,
-          readFileSync(new URL("./upgrade-probe.mjs", import.meta.url), "utf8"),
-        ),
-      );
+  const frozen = await backend.inspect();
   assertSafeState(frozen.state);
   assert.equal(
     frozen.otherClientSessions,

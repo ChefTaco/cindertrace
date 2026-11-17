@@ -9,13 +9,14 @@ locators, and other sensitive operational metadata. Treat them as private data.
 
 The default installation enables local administrator login and signed ingestion.
 Collectors, listeners, Hive login/export, Magnus inventory/response, and other
-external sources require explicit configuration. Browser requests use the console's
-same-origin proxy; integration credentials remain on the server.
+external sources require explicit configuration. Browser requests reach the API through
+a same-origin gateway that forwards only the API's own session cookie; integration
+credentials remain on the server.
 
-Native API and console authentication audit records use keyed account/source labels and retain
-the source IP address. Labels are pseudonyms, not anonymization. The console does
-not log submitted passwords, session cookies, authorization headers, or OAuth
-codes. Other observations can still contain identities supplied by their source.
+Native API authentication audit records use keyed account/source labels and retain
+the source IP address (behind the standalone gateway, the gateway's internal address).
+Labels are pseudonyms, not anonymization. The API does not log submitted passwords,
+session cookies or authorization headers. Other observations can still contain identities supplied by their source.
 Adapters limit collected fields, and audit details are sanitized; review source
 configuration and evidence before sharing it. ChatterMost/Mattermost audit export
 does not collect message bodies.

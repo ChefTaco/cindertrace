@@ -183,7 +183,7 @@ Enrolled-node admission is required; there is no direct-agent fallback.
 Read and investigation-draft credentials remain endpoint-scoped. They cannot
 approve containment. Native approval uses an authenticated ADMIN session.
 `SECURITY_APPROVAL_MODE=external` requires the configured signed approval adapter;
-console approval cannot bypass that installation policy. Historical external
+native approval cannot bypass that installation policy. Historical external
 decisions remain preserved and never become new executable approvals.
 
 Server-side agents can use `CindertraceClient` from the integration workspace.

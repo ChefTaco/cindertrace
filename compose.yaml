@@ -46,16 +46,48 @@ services:
       test: [CMD, node, -e, "fetch('https://localhost:4101/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       retries: 10
-  console:
-    <<: *app
-    working_dir: /app/console/apps/security-console
-    command: [node, server-tls.mjs]
-    environment: {PORT: '3444', HOSTNAME: '0.0.0.0'}
-    ports: ['127.0.0.1:${CINDERTRACE_CONSOLE_PORT:-3444}:3444']
+  # HiveXUI in local mode: Cindertrace pages only, signed in by the API's own local sign-in.
+  # Static files only; it is reached through the gateway and has no published port.
+  ui:
+    image: '${CINDERTRACE_UI_IMAGE:-ghcr.io/cheftaco/hivexui@sha256:4f73777b1d598a08e318fb174a0f30458ec6c175a67ca277180df35eb994994f}'
+    user: '101:101'
+    restart: unless-stopped
+    read_only: true
+    tmpfs: ['/tmp:uid=101,gid=101,mode=700', '/var/run:uid=101,gid=101,mode=700']
+    volumes:
+      - ./ui/runtime.json:/usr/share/nginx/html/runtime.json:ro
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/health']
+      interval: 10s
+      retries: 10
+  # The published origin (DASHBOARD_PUBLIC_ORIGIN): TLS, HiveXUI, and /api/cindertrace/* to
+  # the API's /api/v1/*. It receives no product secrets.
+  gateway:
+    build: .
+    image: '${CINDERTRACE_IMAGE:-cindertrace:local}'
+    user: '${CINDERTRACE_UID:-1000}:${CINDERTRACE_GID:-1000}'
+    restart: unless-stopped
+    read_only: true
+    command: [node, scripts/ui-gateway.mjs]
+    environment:
+      CINDERTRACE_GATEWAY_PORT: '3444'
+      CINDERTRACE_API_URL: https://api:4101
+      CINDERTRACE_UI_UPSTREAM: http://ui:8080
+      TLS_CERT_PATH: /certs/server.crt
+      TLS_KEY_PATH: /certs/server.key
+      NODE_EXTRA_CA_CERTS: /certs/server.crt
+    volumes:
+      - ./certs:/certs:ro
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    ports: ['127.0.0.1:${CINDERTRACE_UI_PORT:-3444}:3444']
     depends_on:
       api: {condition: service_healthy}
+      ui: {condition: service_healthy}
     healthcheck:
-      test: [CMD, node, -e, "fetch('https://localhost:3444/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: [CMD, node, -e, "fetch('https://localhost:3444/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
       retries: 10
   collector:

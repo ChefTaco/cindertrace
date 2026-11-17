@@ -1,6 +1,6 @@
 .git
 **/node_modules
-**/.next
+/ui
 **/dist
 **/state
 .env*

@@ -15,9 +15,10 @@ scan built artifacts and record the candidate tree and artifact digests.
 - `services/security-collector`: source adapters and the suite audit-export collector.
 - `packages/contracts` (shared wire types, browser contracts, OpenAPI),
   `packages/integrations`.
-- `apps/security-console`: the retained standalone console (port 3444, lab 3445). It is
-  being retired in favour of HiveXUI; keep it working, but add new UI work to HiveXUI.
-- `scripts` (init, upgrade, lab, integration suites, privacy), `docs`, `examples`.
+- No UI of its own: HiveXUI is the only UI. Standalone and lab Compose installations run
+  the pinned HiveXUI image in local mode (`ui`) behind `scripts/ui-gateway.mjs`
+  (`gateway`, port 3444, lab 3445), which forwards `/api/cindertrace/*` to `/api/v1/*`.
+- `scripts` (init, upgrade, lab, UI gateway, integration suites, privacy), `docs`.
 
 ## Checks
 
@@ -28,7 +29,8 @@ variables; see CONTRIBUTING.md.
 
 ## Rules
 
-The console uses same-origin authenticated proxies. Secrets remain server-side.
+Browsers reach the API through the same-origin gateway, which forwards only the
+`cindertrace_session` cookie. Secrets remain server-side.
 Hive, Magnus, and external sources are optional. The standalone core must work
 without them; disabled integrations must not be reported healthy.
 

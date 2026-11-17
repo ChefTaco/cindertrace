@@ -23,7 +23,7 @@ const probe = readFileSync(
   new URL("./upgrade-probe.mjs", import.meta.url),
   "utf8",
 );
-const appServices = ["api", "console", "collector", "migrate"];
+const appServices = ["api", "gateway", "collector", "migrate"];
 export class ComposeInstallation {
   constructor(root, run) {
     this.root = resolve(root);
@@ -84,6 +84,10 @@ export class ComposeInstallation {
     );
     this.before = await this.configuration();
     this.project = this.before.name;
+    assert(
+      !this.before.services.console && this.before.services.gateway && this.before.services.ui,
+      "This installation still runs the retired standalone console; move it to the HiveXUI gateway layout first (docs/UPGRADING.md)",
+    );
     const statePath =
       this.before.services.api.environment.CINDERTRACE_STATE_DIR ?? "/state";
     this.stateHost = this.hostPath("api", statePath);
@@ -94,14 +98,14 @@ export class ComposeInstallation {
       ),
       "A dedicated backup key is required",
     );
-    for (const name of ["api", "console"])
+    for (const name of ["api", "gateway"])
       for (const key of ["TLS_CERT_PATH", "TLS_KEY_PATH"]) {
         const value = this.before.services[name].environment[key];
         if (value) readFileSync(this.hostPath(name, value));
       }
     assert(/^[a-z0-9][a-z0-9_-]*$/.test(this.project));
     const images = [];
-    for (const n of ["api", "console"]) {
+    for (const n of ["api", "gateway"]) {
       const id = (await this.compose(["ps", "-q", n])).trim();
       assert(id, "A running initialized stack is required");
       const [c] = JSON.parse(await this.run(["docker", "inspect", id]));
@@ -115,7 +119,7 @@ export class ComposeInstallation {
     assert.equal(
       images[0],
       images[1],
-      "Existing console and API use different images",
+      "Existing gateway and API use different images",
     );
     this.oldImage = images[0];
     const s = statfsSync(this.root);
@@ -272,7 +276,7 @@ export class ComposeInstallation {
     };
   }
   async pause(record) {
-    await this.compose(["stop", "console", "collector", "api"]);
+    await this.compose(["stop", "gateway", "collector", "api"]);
     atomicPrivate(
       this.envFile,
       patchEnvironment(
@@ -317,7 +321,7 @@ export class ComposeInstallation {
     const environment = join(state, "environment.private");
     atomicPrivate(environment, this.originalEnv, owner);
     const certs = {};
-    for (const service of ["api", "console"])
+    for (const service of ["api", "gateway"])
       for (const key of ["TLS_CERT_PATH", "TLS_KEY_PATH"]) {
         const file = this.before.services[service].environment[key];
         if (file)
@@ -493,11 +497,11 @@ export class ComposeInstallation {
       "--wait-timeout",
       "120",
       "api",
-      "console",
+      "gateway",
     ]);
   }
   async healthy(record) {
-    for (const n of ["api", "console"]) {
+    for (const n of ["api", "gateway"]) {
       const id = (await this.compose(["ps", "-q", n])).trim();
       const [c] = JSON.parse(await this.run(["docker", "inspect", id]));
       assert.equal(
@@ -529,7 +533,7 @@ export class ComposeInstallation {
       "--wait-timeout",
       "120",
       "api",
-      "console",
+      "gateway",
     ]);
     if (record.collectorEnabled)
       await this.compose([
@@ -566,7 +570,7 @@ export class ComposeInstallation {
         "--wait-timeout",
         "120",
         "api",
-        "console",
+        "gateway",
       ],
       { file: record.beforeFile },
     );

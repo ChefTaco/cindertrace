@@ -13,7 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
-test("runtime staging preserves nested versions and traced shims while excluding optional development peers", () => {
+test("runtime staging preserves nested versions and licences while excluding optional development peers", () => {
   const root = mkdtempSync(join(tmpdir(), "runtime-fixture-"));
   const file = (name, value) => {
     mkdirSync(join(root, name, ".."), { recursive: true });
@@ -26,9 +26,7 @@ test("runtime staging preserves nested versions and traced shims while excluding
     file("release.json", JSON.stringify({ product: "cindertrace", layoutVersion: 1, schemaProfile: "cindertrace-v1" }));
     file("LICENSE", "Synthetic Apache license fixture");
     file("NOTICE", "Synthetic attribution fixture");
-    file("apps/security-console/src/app/fonts/OFL.txt", "Synthetic font license fixture");
     for (const name of [
-      "apps/security-console",
       "services/security-fusion",
       "services/security-collector",
       "packages/contracts",
@@ -58,9 +56,9 @@ test("runtime staging preserves nested versions and traced shims while excluding
     );
     mkdirSync(join(root, "node_modules/@cindertrace"), { recursive: true });
     symlinkSync("../../packages/contracts", join(root, "node_modules/@cindertrace/contracts"), "dir");
-    pkg("apps/security-console", {name: "fixture-console", dependencies: {next: "1.0.0", "native-fixture": "1.0.0"}});
-    pkg("node_modules/next", {name: "next", version: "1.0.0"});
-    file("node_modules/next/unneeded.wasm", "Synthetic unused development asset");
+    pkg("services/security-collector", {name: "fixture-collector", version: "0.1.0", dependencies: {"native-fixture": "1.0.0"}});
+    pkg("node_modules/unused", {name: "unused", version: "1.0.0"});
+    file("node_modules/unused/unneeded.wasm", "Synthetic unused development asset");
     pkg("node_modules/native-fixture", {name: "native-fixture", version: "1.0.0"});
     file("node_modules/native-fixture/index.js", "export const fixture=true;");
     for (const name of ["LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md"])
@@ -74,10 +72,6 @@ test("runtime staging preserves nested versions and traced shims while excluding
     });
     file("services/security-fusion/prisma/migrations/fixture.sql", "SELECT 1;");
     file("services/security-fusion/scripts/apply-migrations.mjs", "// fixture");
-    file(
-      "apps/security-console/dist/node_modules/traced-shim/index.js",
-      "// traced alias",
-    );
     for (const name of [
       "backup.mjs",
       "core-integration.mjs",
@@ -87,13 +81,11 @@ test("runtime staging preserves nested versions and traced shims while excluding
       "lab-integration.mjs",
       "upgrade.mjs",
       "upgrade-policy.mjs",
-      "upgrade-artifacts.mjs",
       "upgrade-probe.mjs",
       "upgrade-compose.mjs",
-      "upgrade-native.mjs",
+      "ui-gateway.mjs",
     ])
       file("scripts/" + name, "// fixture");
-    file("apps/security-console/scripts/stage.mjs", "export const DEPENDENCY_PACKAGES=['native-fixture'];");
     cpSync(new URL("./runtime-dependencies.mjs", import.meta.url), join(root, "scripts/runtime-dependencies.mjs"));
     cpSync(
       new URL("./stage-runtime.mjs", import.meta.url),
@@ -104,7 +96,7 @@ test("runtime staging preserves nested versions and traced shims while excluding
       stdio: "pipe",
     });
     const output = join(root, "artifacts/runtime");
-    for (const name of ["LICENSE", "NOTICE", "apps/security-console/src/app/fonts/OFL.txt"])
+    for (const name of ["LICENSE", "NOTICE"])
       assert.equal(readFileSync(join(output, name), "utf8"), readFileSync(join(root, name), "utf8"));
     assert.equal(
       JSON.parse(
@@ -117,11 +109,9 @@ test("runtime staging preserves nested versions and traced shims while excluding
       ).version,
       "2.0.0",
     );
-    assert(
-      existsSync(join(output, "console/node_modules/traced-shim/index.js")),
-    );
+    assert(existsSync(join(output, "scripts/ui-gateway.mjs")));
     assert(!existsSync(join(output, "node_modules/development-cli")));
-    assert(!existsSync(join(output, "node_modules/next")));
+    assert(!existsSync(join(output, "node_modules/unused")));
     for (const name of ["LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md"])
       assert.equal(readFileSync(join(output, "node_modules/native-fixture", name), "utf8"), readFileSync(join(root, "node_modules/native-fixture", name), "utf8"));
     for (const name of ["README.md", "index.d.ts", "index.d.mts", "index.d.cts"])
