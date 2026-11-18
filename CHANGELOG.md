@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- The collector reads IPFIX and NetFlow v9 flows from Loki. UniFi Network 11 no longer logs firewall hits as syslog lines with `SRC=`/`DST=`/`PROTO=`, so the `netflow` and `unifi_dns` sources went silent; a gateway's IPFIX export decoded by goflow2 (`-format json`) and shipped to Loki now feeds them. Each flow becomes a `netflow` observation of the same kind as before (`unifi.firewall.flow.summary`, `derivedFrom: loki-ipfix`, `ruleSet` `ipfix-outbound`, `ipfix-inbound`, `ipfix-internal` or `ipfix-transit`), plus `unifi_dns` network activity when either port is 53. MAC addresses are not kept.
+- Sampled flow volumes. `sampledBytes` and `sampledPackets` are what the exporter recorded; `estimatedBytes`, `estimatedPackets` and `estimatedFlowCount` multiply them by the sampling rate, taken from the record's `sampling_rate`, else from the stream's `sampling_rate` label, else 1 (`samplingRateSource` says which). Five-minute summaries sum them and state the estimate and the rate in their summary.
+- UniFi Network CEF lines (Activity Logging to a SIEM server) on the Loki path. Threat management, intrusion prevention and honeypot events become `unifi_ids` alerts (`unifi.ids.alert`), firewall events `unifi_ids` firewall alerts (`unifi.firewall.alert`), DNS filtering `unifi_dns` activity; each is ingested on its own, not aggregated, at UniFi's reported UTC time. Audit, monitoring, client, device and system events are skipped, so that an administrator signing in to UniFi Network does not correlate with Wazuh as an endpoint intrusion. CEF was only read by the UDP listener before.
+- Quiet source signal. A source whose polls succeed but that has had no event for `SECURITY_FUSION_QUIET_AFTER_HOURS` hours (default 6, `0` turns it off) reports `degraded` with `no events for more than N hours`. `SECURITY_FUSION_QUIET_SOURCES` lists the watched sources (default `netflow`). After a restart the collector's start time is the baseline.
+
+### Fixed
+
+- Five-minute flow and firewall summaries no longer lose the rows of later polls. A summary's ID covered only its window and dimensions, so the second and later polls (every minute) of the same window produced the same ID, which the queue and ingest dropped as a duplicate; about four fifths of the rows of a busy window were not counted. The ID now also covers the rows a summary counts: later polls become further summaries, a replay of the same rows stays a duplicate. Summaries keep the `derivedFrom` of their rows.
+
+### Changed
+
+- `LOKI_QUERY` should select every stream of the gateway (syslog and flows), for example by a shared `exporter` label; see `docs/INTEGRATIONS.md`.
+
+No database migration is required.
+
 ## [0.8.0] - 2026-11-17
 
 ### Removed
