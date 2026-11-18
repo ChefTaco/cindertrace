@@ -34,8 +34,9 @@ import {
   parseCef,
   parseDnsmasq,
   parseFlowDatagram,
-  parseUnifiLokiEntry,
+  parseUdmLokiEntry,
 } from "./parsers.js";
+import { quietSourceError, readQuietSourcePolicy } from "./source-quiet.js";
 import {
   BoundedSecurityEventQueue,
   boundedFetch,
@@ -53,6 +54,11 @@ import {
 } from "./audit-export.js";
 
 const runtimeConfig = readSecurityCollectorRuntimeConfig();
+const collectorStartedAt = new Date();
+const quietPolicy = readQuietSourcePolicy(
+  process.env,
+  securityFusionSourceSchema.options,
+);
 const auditSources = readAuditExportConfig();
 const controlUrl = (
   process.env["CINDERTRACE_API_URL"] ??
@@ -493,17 +499,21 @@ async function pollLoki(): Promise<void> {
       ? new Set(activeBoundary.fingerprints)
       : new Set<string>();
   const parsedEvents: SecurityFusionEvent[] = [];
+  const alertEvents: SecurityFusionEvent[] = [];
   for (const entry of entries) {
     if (entry.timestampNs > latestNs) latestNs = entry.timestampNs;
     if (entry.timestampNs === parsedCheckpoint && known.has(entry.fingerprint))
       continue;
     const observedAt = new Date(Number(entry.timestampNs / 1_000_000n));
-    parsedEvents.push(
-      ...parseUnifiLokiEntry(entry.line, entry.labels, observedAt),
-    );
+    const parsed = parseUdmLokiEntry(entry.line, entry.labels, observedAt);
+    parsedEvents.push(...parsed.observations);
+    alertEvents.push(...parsed.alerts);
   }
   let full = false;
-  for (const event of aggregateUnifiLokiEvents(parsedEvents))
+  for (const event of [
+    ...alertEvents,
+    ...aggregateUnifiLokiEvents(parsedEvents),
+  ])
     if (!enqueue(event)) full = true;
   if (full)
     throw Error("Loki events exceeded collector queue; checkpoint held");
@@ -608,7 +618,18 @@ function runPoll(
 ): Promise<void> {
   return poll()
     .then(() => {
-      for (const source of sources) setSourceStatus(source, "healthy");
+      const now = new Date();
+      for (const source of sources) {
+        const quiet = quietSourceError(
+          source,
+          sourceHealth.get(source)?.lastEventAt,
+          collectorStartedAt,
+          now,
+          quietPolicy,
+        );
+        if (quiet) setSourceStatus(source, "degraded", quiet);
+        else setSourceStatus(source, "healthy");
+      }
     })
     .catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);

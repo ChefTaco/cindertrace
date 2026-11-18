@@ -15,7 +15,41 @@ bind address and network policy. Tailscale local polling requires
 Network collection through Loki requires `LOKI_URL`, an explicit `LOKI_QUERY`
 selecting the configured source stream, and its dedicated read credential. UI
 audit collection uses `UI_SECURITY_SOURCES_JSON` and the authenticated Loki
-transport; it does not enable network sources. Source status reports stay within
+transport; it does not enable network sources.
+
+### UniFi gateway streams in Loki
+
+One `LOKI_QUERY` feeds `netflow`, `unifi_dns` and `unifi_ids`, so it should select
+every stream the gateway produces, for example `{exporter="gateway"}` when the log
+shipper gives the gateway's syslog and its flow file the same `exporter` label.
+Each entry is read as one of:
+
+- **IPFIX / NetFlow v9 flows** written by [goflow2](https://github.com/netsampler/goflow2)
+  as JSON lines (`-format json`; stream label `job="ipfix"`, or any line starting
+  with `{`). Each flow becomes a `netflow` observation (`derivedFrom: loki-ipfix`,
+  `ruleSet` `ipfix-outbound`, `ipfix-inbound`, `ipfix-internal` or `ipfix-transit`),
+  plus `unifi_dns` network activity when either port is 53. MAC addresses are not kept.
+- **CEF lines** from UniFi Network's Activity Logging (SIEM server) export. Each line
+  becomes one event that is not aggregated (`derivedFrom: loki-cef`).
+- **Firewall syslog lines** with `SRC=`, `DST=` and `PROTO=` (UniFi Network before 11).
+
+Flows and firewall lines are aggregated into five-minute summaries per source,
+direction or rule set, protocol and destination service.
+
+**Sampling.** Gateways sample flows (UniFi: 1 in N). `sampledBytes` and
+`sampledPackets` are what the exporter recorded; `estimatedBytes`,
+`estimatedPackets` and `estimatedFlowCount` multiply them by the sampling rate.
+The rate comes from the record's `sampling_rate` when the exporter announced it
+(`samplingRateSource: exporter`), else from a `sampling_rate` stream label
+(`stream-label`), else 1 (`assumed-unsampled`). UniFi gateways do not announce the
+rate in a form goflow2 decodes, so set the label to the gateway's setting.
+
+**Quiet sources.** A source whose polls succeed but that has had no event for
+`SECURITY_FUSION_QUIET_AFTER_HOURS` hours (default 6, `0` turns it off) reports
+`degraded` with the error `no events for more than N hours`. The watched
+sources are `SECURITY_FUSION_QUIET_SOURCES` (comma separated, default `netflow`);
+leave out sources that are legitimately quiet, such as IDS alerts. After a
+restart the collector's start time is the baseline. Source status reports stay within
 the collector's admitted sources, including disabled sources it owns.
 ChatterMost/Mattermost audit export uses `CHATTERMOST_SECURITY_EXPORT_URL` and
 `CHATTERMOST_SECURITY_EXPORT_TOKEN`. No message bodies are ingested.
