@@ -23,7 +23,7 @@ HiveXUI instead; see [upgrading](docs/UPGRADING.md#from-07x-to-080) for 0.7.x in
 
 Requirements: Node.js 24.22.3+ on the 24.x line or 26.13.1+ on the 26.x line, npm, OpenSSL, and Docker
 with Compose. From a clean checkout of a release tag, for example
-`git clone --branch v0.8.0 https://github.com/ChefTaco/cindertrace.git`:
+`git clone --branch v0.8.1 https://github.com/ChefTaco/cindertrace.git`:
 
 ```sh
 npm ci
