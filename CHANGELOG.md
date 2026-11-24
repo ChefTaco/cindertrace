@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.2] - 2026-11-24
+
+### Security
+
+- The runtime image ships Zstandard 1.6.0 (`libzstd1` 1.5.7-r14 to 1.6.0-r0) for CVE-2026-124851, which affects zstd 1.5.1 to 1.5.7. The PostgreSQL clients pull in `libzstd1`; the runtime stage now requires `libzstd1>=1.6.0` and the image build fails if the installed `libzstd1` is older than 1.6.0.
+- Override `effect` to 3.22.1 for CVE-2026-121707 (GHSA-7589-6fvf-x4pw). The Prisma CLI pulls it in through `@prisma/config`; it is used by `npm ci` checkouts and the image build stage, not shipped in the runtime image.
+
+No database migration is required.
+
 ## [0.8.1] - 2026-11-18
 
 ### Added

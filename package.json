@@ -1,6 +1,6 @@
 {
   "name": "cindertrace",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -46,6 +46,7 @@
   },
   "overrides": {
     "@hono/node-server": "^2.1.8",
+    "effect": "3.22.1",
     "fast-uri": "3.1.9",
     "postcss": {
       ".": "8.5.32",
