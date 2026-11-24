@@ -18,12 +18,15 @@ test('runtime npm compatibility script rejects every command except the Compose 
   assert.match(readFileSync(script, 'utf8'), /cd \/app\/services\/security-fusion\n  exec node scripts\/apply-migrations\.mjs\n/);
 });
 
-test('runtime uses the pinned maintained base and keeps only the migration compatibility command', () => {
+test('runtime uses the pinned maintained base, requires libzstd1 1.6.0 and keeps only the migration compatibility command', () => {
   const dockerfile = readFileSync(resolve(root, 'Dockerfile'), 'utf8');
   assert.match(dockerfile, /ARG RUNTIME_IMAGE=ghcr\.io\/cheftaco\/hive-node-runtime:26\.[0-9.]+-[0-9]+@sha256:[a-f0-9]{64}/);
   const runtime = dockerfile.slice(dockerfile.lastIndexOf('\nFROM '));
   assert.match(runtime, /FROM \$\{RUNTIME_IMAGE\} AS runtime/);
   assert.doesNotMatch(runtime, /apt-get|dpkg|COPY --from=.*\/(usr|lib|bin)/);
-  assert.match(runtime, /apk add --no-cache postgresql-18-client-base/);
+  assert.match(runtime, /apk add --no-cache 'libzstd1>=1\.6\.0' postgresql-18-client-base/);
+  // CVE-2026-124851: the build must refuse a libzstd1 older than 1.6.0.
+  assert.match(runtime, /apk info -e -v libzstd1/);
+  assert.match(runtime, /test "\$\(apk version -t "\$zstd_version" 1\.6\.0\)" != '<'/);
   assert.match(runtime, /COPY --chmod=0755 scripts\/npm-compat.sh \/usr\/local\/bin\/npm/);
 });
