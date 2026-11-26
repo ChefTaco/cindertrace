@@ -382,8 +382,11 @@ export async function pollAuditSource(options: {
   enqueue: (event: SecurityFusionEvent) => boolean;
   pageLimit?: number;
   maxPages?: number;
+  /** Filled in as the poll goes, so a failed poll still reports how far it got. */
+  stats?: { records: number; pages: number };
 }): Promise<void> {
   const { config, tokens, request } = options;
+  const stats = options.stats ?? { records: 0, pages: 0 };
   const { source } = config;
   let cursor = options.cursor;
   const maxPages = options.maxPages ?? AUDIT_EXPORT_MAX_PAGES_PER_POLL;
@@ -405,6 +408,7 @@ export async function pollAuditSource(options: {
     }
     if (!result!.response.ok)
       throw new Error(`${source} audit export returned ${result!.response.status}`);
+    stats.pages++;
     const body = hiveAuditExportPageSchema.safeParse(
       parseBoundedJson<unknown>(result!.body, `${source} audit export`),
     );
@@ -426,6 +430,7 @@ export async function pollAuditSource(options: {
     });
     for (const event of events)
       if (!options.enqueue(event)) throw new Error(`${source} audit queue full; checkpoint held`);
+    stats.records += events.length;
     const next = body.data.nextCursor;
     if (!next || next === cursor || events.length === 0) {
       if (next && next !== cursor) options.setCursor(next);

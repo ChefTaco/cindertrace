@@ -437,6 +437,7 @@ securityFusionRouter.post("/ingest/source-status", async (c) => {
           lastErrorAt:
             item.status === "error" || item.status === "degraded" ? now : null,
           lastError: item.error ?? null,
+          ...(item.poll ? { lastPollAt: now, lastPollRecords: item.poll.records, lastPollPages: item.poll.pages } : {}),
         },
         update: {
           status: item.status,
@@ -455,6 +456,7 @@ securityFusionRouter.post("/ingest/source-status", async (c) => {
           ...(item.status === "configured" || item.status === "unconfigured"
             ? { lastErrorAt: null, lastError: null }
             : {}),
+          ...(item.poll ? { lastPollAt: now, lastPollRecords: item.poll.records, lastPollPages: item.poll.pages } : {}),
         },
       }),
     ),

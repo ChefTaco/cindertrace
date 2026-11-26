@@ -145,6 +145,11 @@ export const securityFusionSourceReportSchema = z.object({
     lastEventAt: z.string().datetime({ offset: true }).optional(),
     checkpoint: z.string().max(2000).optional(),
     error: z.string().max(500).optional(),
+    /** What the last poll read (suite audit exports): records queued and pages fetched. */
+    poll: z.object({
+      records: z.number().int().min(0).max(1_000_000),
+      pages: z.number().int().min(0).max(1_000),
+    }).strict().optional(),
   })).min(1).max(securityFusionSourceSchema.options.length),
 });
 

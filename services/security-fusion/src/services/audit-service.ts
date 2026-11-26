@@ -81,7 +81,7 @@ function logFilePath(dayKey: string): string {
   return path.join(getAuditDir(), `${dayKey}.jsonl`);
 }
 
-interface AuditLogEntry {
+export interface AuditLogEntry {
   id: string;
   action: string;
   actorId: string;
@@ -268,6 +268,32 @@ export async function auditCommitted(params: AuditLogParams): Promise<boolean> {
     incMetric("auditAppendFailures");
     console.error(`Audit append failed after a committed change (${params.action}); check AUDIT_LOG_DIR`);
     return false;
+  }
+}
+
+/** One day's audit entries in file order, each with its 0-based line index and chain state. */
+export async function* auditDayEntries(
+  day: string,
+): AsyncGenerator<{ index: number; entry: AuditLogEntry }> {
+  const file = logFilePath(day);
+  if (!existsSync(file)) return;
+  let head = EMPTY_CHAIN_HASH, broken = false, index = -1;
+  const lines = createInterface({ input: createReadStream(file, { encoding: "utf8" }), crlfDelay: Infinity });
+  for await (const line of lines) {
+    if (!line.trim()) continue;
+    index++;
+    let entry: AuditLogEntry;
+    try {
+      entry = JSON.parse(line) as AuditLogEntry;
+      if (!entry || typeof entry !== "object" || typeof entry.id !== "string") throw new Error("Invalid record");
+    } catch {
+      broken = true;
+      continue;
+    }
+    if (!entry.integrity || entry.prevHash !== head || computeIntegrity(entry, head) !== entry.integrity) broken = true;
+    head = entry.integrity;
+    entry.verificationState = broken ? "invalid" : entry.chainVersion === 2 ? "verified" : "legacy-partial";
+    yield { index, entry };
   }
 }
 

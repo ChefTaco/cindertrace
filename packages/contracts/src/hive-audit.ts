@@ -43,3 +43,28 @@ export const hiveAuditExportPageSchema = z.object({
   data: z.array(z.unknown()).max(200),
   nextCursor: z.string().min(1).max(2000).nullable(),
 });
+
+/**
+ * Cindertrace's own audit, served at `GET /api/v1/audit/export` in the same HiveAuditRecord v1
+ * shape (product `cindertrace`). `details.chain` is the hash chain state of the source entry:
+ * `verified`, `legacy-partial` or `invalid`.
+ */
+export const cindertraceAuditRecordSchema = z.object({
+  id: z.string().regex(/^cindertrace:audit:[A-Za-z0-9._:-]{1,200}$/),
+  product: z.literal('cindertrace'),
+  occurredAt: z.string().datetime({ offset: true }),
+  action: z.string().max(160).regex(/^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/),
+  outcome: z.enum(['success', 'failure']),
+  actor: z.object({
+    type: z.enum(['user', 'service', 'agent', 'system']),
+    id: z.string().min(1).max(512),
+  }),
+  target: z.object({ type: optionalText(160), id: optionalText(512) }).optional(),
+  details: z.record(z.string(), scalar)
+    .refine((details) => new TextEncoder().encode(JSON.stringify(details)).length <= MAX_DETAILS_BYTES, 'details exceed 4 KB'),
+});
+export type CindertraceAuditRecord = z.infer<typeof cindertraceAuditRecordSchema>;
+export const cindertraceAuditExportPageSchema = z.object({
+  data: z.array(cindertraceAuditRecordSchema).max(200),
+  nextCursor: z.string().min(1).max(2000).nullable(),
+});

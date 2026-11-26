@@ -92,6 +92,15 @@ export async function authMiddleware(c: Context<AppVariables>, next: Next) {
   );
   const labControl = tokenMatches(token, process.env["SECURITY_PLUGIN_LAB_CONTROL_TOKEN_SHA256"]);
   const workflow = tokenMatches(token, process.env["SECURITY_PLUGIN_WORKFLOW_TOKEN_SHA256"]);
+  // Endpoint-scoped: GET /api/v1/audit/export only.
+  const auditExport = tokenMatches(token, process.env["SECURITY_AUDIT_EXPORT_TOKEN_SHA256"]);
+  if (auditExport) {
+    if (c.req.method !== "GET" || c.req.path !== "/api/v1/audit/export")
+      throw new HttpError(403, "FORBIDDEN", "Service credential is endpoint-scoped");
+    c.set("user", { userId: "service:audit-export", email: "", role: "VIEWER", iat: 0, exp: 0 });
+    await next();
+    return;
+  }
   const sentiBridge = tokenMatches(token, process.env["SECURITY_EXTERNAL_APPROVAL_TOKEN_SHA256"] ?? process.env["SECURITY_SENTI_BRIDGE_TOKEN_SHA256"]);
   if (read || draft || workflow || sentiBridge || labControl) {
     const path = c.req.path.replace("/api/v1/security-fusion", "");

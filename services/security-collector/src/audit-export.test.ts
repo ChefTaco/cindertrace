@@ -287,6 +287,7 @@ describe("pollAuditSource", () => {
     });
     const events: SecurityFusionEvent[] = [];
     const cursors: string[] = [];
+    const stats = { records: 0, pages: 0 };
     await pollAuditSource({
       config,
       tokens: new OathweaveTokenCache(stub.request),
@@ -294,7 +295,10 @@ describe("pollAuditSource", () => {
       setCursor: (cursor) => cursors.push(cursor),
       request: stub.request,
       enqueue: (event) => events.push(event) > 0,
+      stats,
     });
+    // Three pages fetched (the last one empty), three distinct records queued.
+    expect(stats).toEqual({ records: 3, pages: 3 });
     expect(stub.calls.map((c) => [c.after, c.limit])).toEqual([
       ["c1", "200"],
       ["c3", "200"],
