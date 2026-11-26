@@ -35,7 +35,7 @@ Cindertrace's pages and signs in with the API's own local sign-in
   `X-Forwarded-For` and sets `X-Forwarded-Proto`. Its health
   check fetches `/health` through itself and `ui`.
 
-The page origin must equal the API's `DASHBOARD_PUBLIC_ORIGIN` (init sets
+The page origin must equal the API's `CINDERTRACE_PUBLIC_ORIGIN` (init sets
 `https://localhost:3444`), because the API accepts browser sign-in and changes only from
 that exact origin. The API trusts the gateway's `X-Forwarded-For` (Compose sets
 `CINDERTRACE_TRUSTED_PROXIES=gateway`), so sign-in throttling and rate limits apply per
@@ -43,7 +43,7 @@ browser address; behind another reverse proxy, add that proxy as described in
 [client addresses](BROWSER_AUTH.md#client-addresses-behind-the-gateway-or-ingress).
 
 For a remote installation, replace the TLS certificate/key (keep `localhost` in its
-names, or adjust the gateway and API health checks), set `DASHBOARD_PUBLIC_ORIGIN` to the
+names, or adjust the gateway and API health checks), set `CINDERTRACE_PUBLIC_ORIGIN` to the
 exact HTTPS origin people open, and publish the gateway on your chosen interface in a
 `compose.override.yaml`. Set `NODE_EXTRA_CA_CERTS` to the issuing CA for private PKI.
 Certificate verification must stay enabled. Renew certificates separately from code
@@ -57,8 +57,33 @@ Back up state and PostgreSQL together.
 
 Optional integration configuration is documented in INTEGRATIONS.md. Keep all
 secrets out of browser variables, command arguments, logs, and Git.
-`SECURITY_CONSOLE_TOKEN_SECRET` keeps its name: the API still accepts short-lived
-tokens signed with it, which the bundled demo and integration scripts use.
+## Setting names
+
+Some settings were named after the retired standalone console. Each has a Cindertrace
+name now; the old name keeps working, and the API refuses to start if both are set to
+different values. `npm run init` writes the new names; Hive suite installations and
+older `.env` files keep the old ones.
+
+| Setting | Legacy name |
+|---|---|
+| `CINDERTRACE_PUBLIC_ORIGIN` | `DASHBOARD_PUBLIC_ORIGIN` |
+| `CINDERTRACE_ADMIN_USERNAME` (`_B64`) | `DASHBOARD_ADMIN_USERNAME` (`_B64`) |
+| `CINDERTRACE_ADMIN_PASSWORD_HASH` (`_B64`) | `DASHBOARD_ADMIN_PASSWORD_HASH` (`_B64`) |
+| `CINDERTRACE_ADMIN_PASSWORD` (`_B64`) | `DASHBOARD_ADMIN_PASSWORD` (`_B64`) |
+| `CINDERTRACE_ADMIN_ACCOUNT_ID` | `DASHBOARD_ADMIN_ACCOUNT_ID` |
+| `SECURITY_APPROVAL_MODE=local` | `SECURITY_APPROVAL_MODE=console` |
+
+`SECURITY_CONSOLE_TOKEN_SECRET` is no longer used: the API stopped accepting the
+console's short-lived bearer tokens, and it is no longer required. You can remove it
+from `.env`. The bundled demo signs in as the local administrator, and the in-process
+test suites use their own test-only bearer secret, which the API server refuses at startup.
+
+These console-era names are frozen wire values and stay as they are, because stored
+records, signed payloads or HiveXUI depend on them: the approval decision source
+`console`, the case detail's `approvalMode: "console"`, the `security_console` event source
+and the collector's `security-console-security` log application (events the retired
+console wrote), and the `cindertrace_session` cookie. The upgrade command's check for a
+`console` service detects installations that still need the 0.8.0 layout move.
 
 Use the dedicated [upgrade command and recovery runbook](UPGRADING.md) for subsequent
 releases. It supports Compose installations, with frozen backup/restore verification

@@ -12,7 +12,7 @@ assert.equal(env.CINDERTRACE_LAB_CONFIRM, 'isolated-synthetic-installation');
 assert.equal(env.COMPOSE_PROJECT_NAME, `cindertrace-lab-${env.CINDERTRACE_LAB_INSTALLATION_ID}`);
 // HiveXUI signs in with the API's own local sign-in, so the API must offer it.
 assert.equal(env.CINDERTRACE_BROWSER_AUTH_ENABLED, 'true', 'The lab API must own local sign-in');
-const origin = env.DASHBOARD_PUBLIC_ORIGIN;
+const origin = env.CINDERTRACE_PUBLIC_ORIGIN ?? env.DASHBOARD_PUBLIC_ORIGIN;
 assert.equal(new URL(origin).hostname, 'localhost');
 const output = process.env.CINDERTRACE_LAB_BROWSER_OUTPUT;
 if (output) {

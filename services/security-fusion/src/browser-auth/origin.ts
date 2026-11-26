@@ -1,10 +1,11 @@
+import { setting } from "../config/settings.js";
 /** Browser mutations accept only the configured HTTPS origin, never forwarded headers. */
 export function exactBrowserOrigin(
   origin: string | undefined,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   try {
-    const configured = new URL(env.DASHBOARD_PUBLIC_ORIGIN ?? "");
+    const configured = new URL(setting(env, "CINDERTRACE_PUBLIC_ORIGIN") ?? "");
     return (
       configured.protocol === "https:" &&
       !configured.username &&

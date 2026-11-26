@@ -35,13 +35,13 @@ async function run() {
   Object.assign(process.env, {
     DATABASE_URL: database, REDIS_URL: process.env.CINDERTRACE_TEST_REDIS_URL,
     REDIS_PREFIX: 'response-test-' + randomUUID() + ':',
-    SECURITY_CONSOLE_TOKEN_SECRET: randomBytes(48).toString('hex'),
+    CINDERTRACE_TEST_BEARER_SECRET: randomBytes(48).toString('hex'),
     AUDIT_HMAC_SECRET: randomBytes(48).toString('hex'),
     SECURITY_FUSION_RECEIPT_SIGNING_KEY: randomBytes(48).toString('hex'),
     SECURITY_WRITES_ENABLED: 'true', SECURITY_DISPATCH_ENABLED: 'false',
     SECURITY_INGEST_ENABLED: 'false', SECURITY_RETENTION_ENABLED: 'false',
     SECURITY_NOTIFICATIONS_ENABLED: 'false', HIVE_REHEARSAL: 'false',
-    CINDERTRACE_LAB_ENABLED: 'false', SECURITY_APPROVAL_MODE: 'native',
+    CINDERTRACE_LAB_ENABLED: 'false', SECURITY_APPROVAL_MODE: 'local',
     AUDIT_LOG_DIR: join(state, 'audit'), SECURITY_FUSION_EVIDENCE_DIR: join(state, 'evidence'),
     SECURITY_FUSION_RECEIPT_CHAIN_EXPORT: join(state, 'receipts.jsonl'),
     MAGNUS_RESPONSE_SECRET: randomBytes(48).toString('hex'),
@@ -54,7 +54,6 @@ async function run() {
   const {bridgeSignature, equalSignature, responseRequestSchema} = await import('../packages/integrations/dist/index.js');
   const {app} = await import('../services/security-fusion/dist/server.js');
   const {dispatchSecurityFusionOutbox} = await import('../services/security-fusion/dist/services/security-fusion-outbox.js');
-  const {SignJWT} = await import('jose');
   const db = getDb();
   const executions = [];
   let mode = 'success';
@@ -86,9 +85,7 @@ async function run() {
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   process.env.MAGNUS_RESPONSE_URL = `https://localhost:${server.address().port}/response`;
-  const token = await new SignJWT({userId: 'fixture-admin', role: 'ADMIN'}).setProtectedHeader({alg: 'HS256'})
-    .setIssuer('cindertrace-console').setAudience('cindertrace-api').setIssuedAt().setExpirationTime('3m')
-    .sign(new TextEncoder().encode(process.env.SECURITY_CONSOLE_TOKEN_SECRET));
+  const token = await (await import('./test-bearer.mjs')).testBearer('ADMIN', 'fixture-admin', '3m');
   const request = (id, operation, body) => app.request(`/api/v1/security-fusion/actions/${id}/${operation}`, {
     method: 'POST', headers: {authorization: `Bearer ${token}`, 'content-type': 'application/json'},
     ...(body ? {body: JSON.stringify(body)} : {}),

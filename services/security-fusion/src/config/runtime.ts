@@ -5,6 +5,7 @@ import {exactBrowserOrigin} from "../browser-auth/origin.js";
 import { validateLabIsolation } from "./lab-isolation.js";
 import { validateAuthLimitsConfig } from "./auth-limits.js";
 import { parseTrustedProxies } from "../utils/client-address.js";
+import { setting, validateSettingAliases } from "./settings.js";
 /** Validate enabled capabilities without requiring any optional product. */
 import { configuredCollectorCredentials } from "../services/security-fusion-ingest.js";
 export function responseConfigured(
@@ -21,6 +22,7 @@ export function dispatchAvailable(
 export function validateRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
+  validateSettingAliases(env);
   applyRehearsalGuards(env);
   validateLabIsolation(env);
   validateAuthLimitsConfig(env);
@@ -28,20 +30,20 @@ export function validateRuntimeConfig(
   if(browserAuthEnabled(env)){
     credentials(env);
     browserSessionSecret(env);
-    if(!exactBrowserOrigin(env.DASHBOARD_PUBLIC_ORIGIN,env))throw Error("Browser authentication requires an exact HTTPS public origin");
+    if(!exactBrowserOrigin(setting(env,"CINDERTRACE_PUBLIC_ORIGIN"),env))throw Error("Browser authentication requires an exact HTTPS public origin");
     if(env.AUTH_RATE_LIMIT_LABEL_KEY!==undefined&&env.AUTH_RATE_LIMIT_LABEL_KEY.length<32)throw Error("Authentication labels require a dedicated secret of at least 32 characters");
   }
   for (const name of [
     "DATABASE_URL",
     "REDIS_URL",
-    "SECURITY_CONSOLE_TOKEN_SECRET",
     "AUDIT_HMAC_SECRET",
   ]) {
     if (!env[name] || (!name.endsWith("_URL") && env[name]!.length < 32))
       throw new Error(`${name} is required`);
   }
-  if (env["SECURITY_CONSOLE_TOKEN_SECRET"] === env["AUDIT_HMAC_SECRET"])
-    throw new Error("Console and audit secrets must be distinct");
+  // `console` is the legacy spelling of `local`.
+  if (!["local", "console", "external", undefined].includes(env["SECURITY_APPROVAL_MODE"]))
+    throw new Error("SECURITY_APPROVAL_MODE must be local or external");
   if (
     env["SECURITY_WRITES_ENABLED"] === "true" &&
     (!env["SECURITY_FUSION_RECEIPT_SIGNING_KEY"] ||

@@ -67,7 +67,7 @@ services:
       test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/health']
       interval: 10s
       retries: 10
-  # The published origin (DASHBOARD_PUBLIC_ORIGIN): TLS, HiveXUI, and /api/cindertrace/* to
+  # The published origin (CINDERTRACE_PUBLIC_ORIGIN): TLS, HiveXUI, and /api/cindertrace/* to
   # the API's /api/v1/*. It receives no product secrets.
   gateway:
     build: .

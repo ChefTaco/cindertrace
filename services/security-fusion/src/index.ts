@@ -4,6 +4,9 @@ import { readFileSync, existsSync } from "node:fs";
 import { createServer } from "node:https";
 import { resolveListenerSecurity } from "./config/listener-security.js";
 config({ quiet: true });
+// Test bearers are for the in-process test suites; a running API never accepts them.
+if (process.env["CINDERTRACE_TEST_BEARER_SECRET"])
+  throw new Error("CINDERTRACE_TEST_BEARER_SECRET is for test suites only; remove it");
 const { validateRuntimeConfig } = await import("./config/runtime.js");
 validateRuntimeConfig();
 const { authLimitsRelaxed, relaxedAuthLimitsWarning } =
@@ -11,7 +14,6 @@ const { authLimitsRelaxed, relaxedAuthLimitsWarning } =
 if (authLimitsRelaxed()) console.warn(relaxedAuthLimitsWarning());
 for (const key of [
   "DATABASE_URL",
-  "SECURITY_CONSOLE_TOKEN_SECRET",
   "AUDIT_HMAC_SECRET",
 ])
   if (

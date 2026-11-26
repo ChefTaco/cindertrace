@@ -68,7 +68,7 @@ const collectorSecret = "collector-fixture-".repeat(2);
 async function adminToken(): Promise<string> {
   return new SignJWT({ userId: "admin-1", role: "ADMIN" })
     .setProtectedHeader({ alg: "HS256" })
-    .setIssuer("cindertrace-console")
+    .setIssuer("cindertrace-test")
     .setAudience("cindertrace-api")
     .setIssuedAt()
     .setExpirationTime("60s")
@@ -103,7 +103,7 @@ async function patchCase(body: string) {
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
-  vi.stubEnv("SECURITY_CONSOLE_TOKEN_SECRET", consoleSecret);
+  vi.stubEnv("CINDERTRACE_TEST_BEARER_SECRET", consoleSecret);
   vi.stubEnv(
     "SECURITY_FUSION_COLLECTOR_CREDENTIALS_JSON",
     JSON.stringify({ "collector-a": { secret: collectorSecret } }),

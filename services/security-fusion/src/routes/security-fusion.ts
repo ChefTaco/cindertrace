@@ -1,3 +1,4 @@
+import { approvalMode } from "../config/settings.js";
 import { registerLabRoutes } from "./investigation-lab.js";
 import { decideAsAdmin } from "../services/approval-decisions.js";
 import { dispatchAvailable, responseConfigured } from "../config/runtime.js";
@@ -882,7 +883,7 @@ securityFusionRouter.get("/cases/:id", async (c) => {
     c.req.param("id"),
     hasPermission(getUser(c), "security-fusion:evidence:read"),
   );
-  return c.json({ success: true, data: { ...detail, responseAvailable: dispatchAvailable(), canApprove: getUser(c).role === "ADMIN", approvalMode: process.env["SECURITY_APPROVAL_MODE"] === "external" ? "external" : "console" } });
+  return c.json({ success: true, data: { ...detail, responseAvailable: dispatchAvailable(), canApprove: getUser(c).role === "ADMIN", approvalMode: approvalMode() === "external" ? "external" : "console" } });
 });
 
 securityFusionRouter.patch(

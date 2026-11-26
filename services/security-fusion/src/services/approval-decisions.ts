@@ -3,6 +3,7 @@ import { getDb } from "../db/index.js";
 import { HttpError } from "../middleware/error-handler.js";
 import { validateStoredContainmentPlan } from "./senti-containment-approval.js";
 import { dispatchAvailable, responseConfigured } from "../config/runtime.js";
+import { approvalMode } from "../config/settings.js";
 export { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
 import { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
 export async function decideAsAdmin(
@@ -11,7 +12,7 @@ export async function decideAsAdmin(
   decision: "approve" | "reject",
   raw: unknown,
 ) {
-  if (process.env["SECURITY_APPROVAL_MODE"] === "external")
+  if (approvalMode() === "external")
     throw new HttpError(
       403,
       "EXTERNAL_APPROVAL_REQUIRED",
@@ -105,6 +106,7 @@ export async function decideAsAdmin(
       data: {
         id,
         actionId,
+        // Frozen wire value for a local administrator decision, kept in stored decision records.
         source: "console",
         decision,
         actorId,

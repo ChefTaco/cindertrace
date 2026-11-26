@@ -115,7 +115,7 @@ try {
   await run([process.execPath, join(source, "scripts/init.mjs"), fixture]);
   const env = readEnvironment(readFileSync(join(fixture, ".env"), "utf8"));
   env.COMPOSE_PROJECT_NAME = "cindertrace-upgrade-" + id.slice(0, 8);
-  env.DASHBOARD_PUBLIC_ORIGIN = "https://localhost:35444";
+  env.CINDERTRACE_PUBLIC_ORIGIN = "https://localhost:35444";
   env.CINDERTRACE_IMAGE =
     process.env.CINDERTRACE_UPGRADE_BASE_IMAGE ?? "cindertrace:local";
   env.CINDERTRACE_UI_IMAGE = previousUi;

@@ -10,6 +10,7 @@ import { exactBrowserOrigin } from "./origin.js";
 import { logAuditEvent } from "../services/audit-service.js";
 import { beginAuthentication } from "./throttling.js";
 import { validateLocalCredentials } from "./credentials.js";
+import { setting } from "../config/settings.js";
 import {
   BrowserSessions,
   browserSessions,
@@ -122,7 +123,7 @@ export function browserAuthRouter(
         return c.json({ error: "Invalid credentials" }, 401);
       }
       const token = await (await sessions()).create(body.username),
-        actorId = env.DASHBOARD_ADMIN_ACCOUNT_ID ?? body.username;
+        actorId = setting(env, "CINDERTRACE_ADMIN_ACCOUNT_ID") ?? body.username;
       await audit(
         "auth.login_succeeded",
         actorId,
@@ -165,7 +166,7 @@ export function browserAuthRouter(
       return c.json({
         username: session.username,
         userId:
-          session.userId ?? env.DASHBOARD_ADMIN_ACCOUNT_ID ?? session.username,
+          session.userId ?? setting(env, "CINDERTRACE_ADMIN_ACCOUNT_ID") ?? session.username,
         role: session.role,
         provider: session.provider === "oathweave" ? "oathweave" : "local",
       });
@@ -181,7 +182,7 @@ export function browserAuthRouter(
         await service.revoke(session, c.req.query("all") === "true");
         await audit(
           "auth.logout",
-          session.userId ?? env.DASHBOARD_ADMIN_ACCOUNT_ID ?? session.username,
+          session.userId ?? setting(env, "CINDERTRACE_ADMIN_ACCOUNT_ID") ?? session.username,
           { all: c.req.query("all") === "true" },
           await peerAddress(c, env),
           session.username,

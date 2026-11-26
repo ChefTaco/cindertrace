@@ -125,6 +125,7 @@ for (const name of [
   "demo.mjs",
   "lab.mjs",
   "lab-integration.mjs",
+  "test-bearer.mjs",
   "upgrade.mjs",
   "upgrade-policy.mjs",
   "upgrade-probe.mjs",

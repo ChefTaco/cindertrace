@@ -109,9 +109,41 @@ describe("independent authorization", () => {
       expect(response.status, `${method} ${path}`).toBe(allowed ? 404 : 403);
     }
   });
+  it("no longer accepts tokens signed with the retired console secret", async () => {
+    const secret = "c".repeat(40);
+    vi.stubEnv("SECURITY_CONSOLE_TOKEN_SECRET", secret);
+    const token = await new SignJWT({ userId: "u", role: "ADMIN" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer("cindertrace-console")
+      .setAudience("cindertrace-api")
+      .setIssuedAt()
+      .setExpirationTime("60s")
+      .sign(new TextEncoder().encode(secret));
+    const status = async () =>
+      (await app.request("/api/v1/security-fusion/cases", { headers: { Authorization: `Bearer ${token}` } })).status;
+    expect(await status()).toBe(401);
+    // Even with the test-suite secret set to the same value, the console issuer is refused.
+    vi.stubEnv("CINDERTRACE_TEST_BEARER_SECRET", secret);
+    expect(await status()).toBe(401);
+  });
+  it("accepts test-suite bearers only while their secret is set", async () => {
+    const secret = "t".repeat(40);
+    const token = await new SignJWT({ userId: "u", role: "OPERATOR" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer("cindertrace-test")
+      .setAudience("cindertrace-api")
+      .setIssuedAt()
+      .setExpirationTime("60s")
+      .sign(new TextEncoder().encode(secret));
+    const status = async () =>
+      (await app.request("/api/v1/security-fusion/cases", { headers: { Authorization: `Bearer ${token}` } })).status;
+    expect(await status()).toBe(401);
+    vi.stubEnv("CINDERTRACE_TEST_BEARER_SECRET", secret);
+    expect(await status()).toBe(200);
+  });
   it("rejects a console assertion minted for Magnus", async () => {
     const secret = "s".repeat(40);
-    vi.stubEnv("SECURITY_CONSOLE_TOKEN_SECRET", secret);
+    vi.stubEnv("CINDERTRACE_TEST_BEARER_SECRET", secret);
     const token = await new SignJWT({ userId: "u", role: "ADMIN" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("magnus")

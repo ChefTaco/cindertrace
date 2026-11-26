@@ -26,7 +26,6 @@ const random = () => randomBytes(32).toString("hex");
 const password = random(),
   postgres = random(),
   session = random(),
-  consoleSecret = random(),
   audit = random(),
   ingest = random();
 const adminHash = await hash(password);
@@ -63,11 +62,10 @@ const env = {
   DATABASE_URL: `postgresql://cindertrace:${postgres}@postgres:5432/${databaseName}`,
   REDIS_URL: "redis://redis:6379/0",
   CINDERTRACE_API_URL: "https://api:4101",
-  DASHBOARD_PUBLIC_ORIGIN: lab ? "https://localhost:3445" : "https://localhost:3444",
-  DASHBOARD_ADMIN_USERNAME: "admin",
-  DASHBOARD_ADMIN_PASSWORD_HASH_B64: Buffer.from(adminHash).toString("base64"),
+  CINDERTRACE_PUBLIC_ORIGIN: lab ? "https://localhost:3445" : "https://localhost:3444",
+  CINDERTRACE_ADMIN_USERNAME: "admin",
+  CINDERTRACE_ADMIN_PASSWORD_HASH_B64: Buffer.from(adminHash).toString("base64"),
   SESSION_SECRET: session,
-  SECURITY_CONSOLE_TOKEN_SECRET: consoleSecret,
   AUDIT_HMAC_SECRET: audit,
   SECURITY_FUSION_RECEIPT_SIGNING_KEY: random(),
   SECURITY_BACKUP_ENCRYPTION_KEY: random(),
@@ -98,7 +96,7 @@ const env = {
       ],
     },
   }),
-  // The API owns local sign-in; HiveXUI signs in through the gateway at DASHBOARD_PUBLIC_ORIGIN.
+  // The API owns local sign-in; HiveXUI signs in through the gateway at CINDERTRACE_PUBLIC_ORIGIN.
   CINDERTRACE_BROWSER_AUTH_ENABLED: "true",
   SECURITY_SUMMARY_TOKEN_SHA256: createHash("sha256")
     .update(random())
@@ -108,7 +106,7 @@ const env = {
   SECURITY_INGEST_ENABLED: "true",
   SECURITY_RETENTION_ENABLED: "true",
   SECURITY_DISPATCH_ENABLED: "false",
-  SECURITY_APPROVAL_MODE: "console",
+  SECURITY_APPROVAL_MODE: "local",
   SECURITY_FUSION_UDP_ENABLED: "false",
   TAILSCALE_LOCAL_ENABLED: "false",
   TLS_CERT_PATH: "/certs/server.crt",

@@ -3,7 +3,6 @@ import { validateRuntimeConfig } from "./runtime.js";
 const core = {
   DATABASE_URL: "postgresql://fixture@localhost/cindertrace_test_core",
   REDIS_URL: "redis://localhost:6379",
-  SECURITY_CONSOLE_TOKEN_SECRET: "fixture-console-secret-".repeat(3),
   AUDIT_HMAC_SECRET: "fixture-audit-secret-".repeat(3),
 };
 it("starts the security core without Magnus, Hive, or node credentials", () => {
@@ -40,7 +39,7 @@ it("rejects secret reuse across browser, audit, and execution purposes", () => {
     validateRuntimeConfig({
       ...core,
       MAGNUS_RESPONSE_URL: "https://magnus.example.com/response",
-      MAGNUS_RESPONSE_SECRET: core.SECURITY_CONSOLE_TOKEN_SECRET,
+      MAGNUS_RESPONSE_SECRET: core.AUDIT_HMAC_SECRET,
     }),
   ).toThrow(/distinct/);
 });
@@ -53,4 +52,32 @@ it("accepts only exact relaxed authentication limit values", () => {
     expect(() =>
       validateRuntimeConfig({ ...core, RELAX_AUTH_LIMITS: value }),
     ).toThrow("RELAX_AUTH_LIMITS");
+});
+it("no longer requires the retired console token secret", () => {
+  expect(() => validateRuntimeConfig(core)).not.toThrow();
+  // Installations that still set it keep starting; the value is ignored.
+  expect(() => validateRuntimeConfig({ ...core, SECURITY_CONSOLE_TOKEN_SECRET: "x".repeat(64) })).not.toThrow();
+});
+it("accepts the new setting names and refuses disagreeing legacy names", () => {
+  const browser = {
+    ...core,
+    CINDERTRACE_BROWSER_AUTH_ENABLED: "true",
+    SESSION_SECRET: "fixture-session-secret-".repeat(3),
+    CINDERTRACE_ADMIN_USERNAME: "admin",
+    CINDERTRACE_ADMIN_PASSWORD: "fixture-password",
+  };
+  expect(() => validateRuntimeConfig({ ...browser, CINDERTRACE_PUBLIC_ORIGIN: "https://ui.example.com" })).not.toThrow();
+  expect(() => validateRuntimeConfig({ ...browser, DASHBOARD_PUBLIC_ORIGIN: "https://ui.example.com" })).not.toThrow();
+  expect(() =>
+    validateRuntimeConfig({
+      ...browser,
+      CINDERTRACE_PUBLIC_ORIGIN: "https://ui.example.com",
+      DASHBOARD_PUBLIC_ORIGIN: "https://other.example.com",
+    }),
+  ).toThrow(/disagree/);
+});
+it("accepts local approval under its new and legacy names only", () => {
+  for (const mode of [undefined, "local", "console", "external"])
+    expect(() => validateRuntimeConfig({ ...core, SECURITY_APPROVAL_MODE: mode })).not.toThrow();
+  expect(() => validateRuntimeConfig({ ...core, SECURITY_APPROVAL_MODE: "externel" })).toThrow(/SECURITY_APPROVAL_MODE/);
 });

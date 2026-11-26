@@ -60,7 +60,7 @@ const caseRow = {
 async function consoleToken(role: string) {
   return new SignJWT({ userId: "user", role })
     .setProtectedHeader({ alg: "HS256" })
-    .setIssuer("cindertrace-console")
+    .setIssuer("cindertrace-test")
     .setAudience("cindertrace-api")
     .setIssuedAt()
     .setExpirationTime("60s")
@@ -80,7 +80,7 @@ function request(query: string, headers: Record<string, string>) {
 }
 
 beforeEach(() => {
-  vi.stubEnv("SECURITY_CONSOLE_TOKEN_SECRET", "x".repeat(64));
+  vi.stubEnv("CINDERTRACE_TEST_BEARER_SECRET", "x".repeat(64));
   vi.stubEnv("CINDERTRACE_BROWSER_AUTH_ENABLED", "true");
   state.queryRaw.mockReset().mockResolvedValue([{ id: "case-1" }]);
   state.caseFindMany.mockReset().mockResolvedValue([caseRow]);

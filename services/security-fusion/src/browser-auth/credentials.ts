@@ -1,15 +1,16 @@
 import { timingSafeEqualString } from "@hivemagnus/hive-common/secrets";
 import { verify } from "argon2";
+import { setting, type AliasedSetting } from "../config/settings.js";
 
-/** Preserve dedicated console credentials and their generation inputs on adoption. */
+/** The local administrator: `CINDERTRACE_ADMIN_*` (or the legacy `DASHBOARD_ADMIN_*`) settings. */
 export function credentials(env: NodeJS.ProcessEnv = process.env): {
   username: string;
   password?: string;
   passwordHash?: string;
 } {
-  const value = (name: string): string | undefined => {
-    const encoded = env[name + "_B64"];
-    if (encoded === undefined) return env[name];
+  const value = (name: AliasedSetting): string | undefined => {
+    const encoded = setting(env, (name + "_B64") as AliasedSetting);
+    if (encoded === undefined) return setting(env, name);
     if (
       !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
         encoded,
@@ -18,10 +19,10 @@ export function credentials(env: NodeJS.ProcessEnv = process.env): {
       throw Error("Invalid encoded authentication configuration");
     return Buffer.from(encoded, "base64").toString("utf8");
   };
-  const username = value("DASHBOARD_ADMIN_USERNAME"),
-    password = value("DASHBOARD_ADMIN_PASSWORD");
+  const username = value("CINDERTRACE_ADMIN_USERNAME"),
+    password = value("CINDERTRACE_ADMIN_PASSWORD");
   if (username && password) return { username, password };
-  const passwordHash = value("DASHBOARD_ADMIN_PASSWORD_HASH");
+  const passwordHash = value("CINDERTRACE_ADMIN_PASSWORD_HASH");
   if (!username || !passwordHash?.startsWith("$argon2id$"))
     throw Error("Dedicated administrator credentials are required");
   return { username, passwordHash };
