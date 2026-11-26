@@ -134,7 +134,9 @@ export function buildOpenApiSpec() {
     openapi: "3.1.0",
     info: {
       title: "Cindertrace API",
-      version: "0.2.1",
+      // The API document's version (the /api/v1 contract), not the product release, so it
+      // cannot go stale; the product version is in package.json and the image tag.
+      version: "1",
       description:
         "Standalone security cases, evidence, investigation, and exact-plan response approvals. Ingestion requires source-bound HMAC headers. Agent credentials never approve containment.",
     },
