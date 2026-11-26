@@ -37,6 +37,40 @@ Origin. Bearer and signed native clients retain their existing protocols. Redis
 or audit failure denies sign-in; failed durable revocation does not clear the
 cookie or pretend sign-out succeeded.
 
+## More local accounts, roles and TOTP
+
+Without Oathweave, a standalone installation can give out more than the administrator
+account. `CINDERTRACE_LOCAL_ACCOUNTS_JSON` lists further local accounts:
+
+```json
+[
+  {"username": "analyst", "passwordHash": "$argon2id$...", "role": "OPERATOR", "totpSecret": "BASE32SECRET..."},
+  {"username": "auditor", "passwordHash": "$argon2id$...", "role": "VIEWER", "userId": "local-auditor"}
+]
+```
+
+`role` is `ADMIN`, `OPERATOR` or `VIEWER`, with the same permissions as an Oathweave link.
+`passwordHash` must be Argon2id; make one with the hash tool under
+[fresh initialization](#fresh-initialization). `userId` is the actor ID in cases, approvals
+and the audit (default `local:<username>`). Usernames and user IDs must be unique,
+including the administrator's. Because Compose interpolates `$` in `.env`, put the JSON
+base64-encoded in `CINDERTRACE_LOCAL_ACCOUNTS_JSON_B64` instead; a malformed value stops
+the API at startup. Up to 100 accounts.
+
+An account with `totpSecret` (base32, at least 128 bits; 160 bits is usual) also needs a
+six-digit authenticator code (RFC 6238: SHA-1, 30-second steps, one step of drift either
+way). `CINDERTRACE_ADMIN_TOTP_SECRET` does the same for the administrator. Sign-in sends
+it as `totp`; without it the API answers 401 `{"error":"Authentication code required",
+"totpRequired":true}` once the password is right, and the client asks for the code. Each
+code works once per account. Missing and wrong codes are audited as `auth.login_failed`
+(reason `totp_required` or `totp_invalid`) and count against the sign-in limits. HiveXUI
+must offer the code field for these accounts to sign in through it.
+
+Sessions carry the account's role and user ID, read again from the configuration on every
+request. Changing an account's password, role, user ID or TOTP secret, or removing it,
+ends its sessions; so does adding TOTP to the administrator. The administrator's sessions
+are otherwise bound as before, so existing sessions survive an upgrade.
+
 ## Client addresses behind the gateway or ingress
 
 Sign-in throttling, the API rate limits and authentication audit records are keyed on

@@ -9,7 +9,8 @@ import { clientAddress } from "../utils/client-address.js";
 import { exactBrowserOrigin } from "./origin.js";
 import { logAuditEvent } from "../services/audit-service.js";
 import { beginAuthentication } from "./throttling.js";
-import { validateLocalCredentials } from "./credentials.js";
+import { authenticateLocal } from "./credentials.js";
+import { verifyTotp } from "./totp.js";
 import { setting } from "../config/settings.js";
 import {
   BrowserSessions,
@@ -110,9 +111,8 @@ export function browserAuthRouter(
         c.header("Retry-After", String(permit.retryAfterSeconds));
         return c.json({ error: "Too many login attempts" }, 429);
       }
-      if (
-        !(await validateLocalCredentials(body.username, body.password, env))
-      ) {
+      const account = await authenticateLocal(body.username, body.password, env);
+      if (!account) {
         await audit(
           "auth.login_failed",
           "anonymous",
@@ -122,8 +122,25 @@ export function browserAuthRouter(
         );
         return c.json({ error: "Invalid credentials" }, 401);
       }
-      const token = await (await sessions()).create(body.username),
-        actorId = setting(env, "CINDERTRACE_ADMIN_ACCOUNT_ID") ?? body.username;
+      if (account.totpSecret) {
+        // The password was right; the account also needs a fresh authenticator code.
+        const step = body.totp === undefined ? null : verifyTotp(account.totpSecret, body.totp);
+        if (step === null || !(await (await sessions()).consumeTotpStep(account.username, step))) {
+          await audit(
+            "auth.login_failed",
+            "anonymous",
+            { ...labels, reason: body.totp === undefined ? "totp_required" : "totp_invalid" },
+            source,
+            body.username,
+          );
+          return c.json(
+            { error: body.totp === undefined ? "Authentication code required" : "Invalid credentials", totpRequired: true },
+            401,
+          );
+        }
+      }
+      const token = await (await sessions()).create(account.username),
+        actorId = account.userId;
       await audit(
         "auth.login_succeeded",
         actorId,
@@ -141,9 +158,9 @@ export function browserAuthRouter(
       });
       return c.json({
         ok: true,
-        username: body.username,
+        username: account.username,
         userId: actorId,
-        role: "ADMIN",
+        role: account.role,
       });
     } catch {
       await audit(
