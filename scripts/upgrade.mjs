@@ -195,6 +195,7 @@ try {
           revision: record.revision,
           status: "ready",
           servicesChanged: false,
+          ui: record.uiImageDecision,
         }),
       );
       unlinkSync(lock);
@@ -293,6 +294,7 @@ try {
       id: record.id,
       revision: record.revision,
       status: "complete",
+      ui: record.uiImageDecision,
       independentRestoreVerified: true,
       backupRetained: true,
     }),

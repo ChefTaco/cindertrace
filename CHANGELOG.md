@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Fresh Compose installations run HiveXUI 0.12.1, up from 0.12.0. `compose.yaml` names the version next to the digest.
+- `npm run upgrade` now moves the `ui` service to the HiveXUI image the release pins. It pulls the image before the downtime, writes it to `.env` as `CINDERTRACE_UI_IMAGE`, restarts `ui` with the API and gateway and waits for it to be healthy; a rollback restores the previous `ui` image. An installation that runs another `ui` image (a mirror or its own build) keeps it. See [the HiveXUI ui image](docs/UPGRADING.md#the-hivexui-ui-image).
+
+### Upgrade notes
+
+- The managed upgrade now restarts `ui` when the release pins a different HiveXUI image, and writes `CINDERTRACE_UI_IMAGE` to `.env`. A `compose.override.yaml` that sets the `ui` image itself stops the upgrade; set `CINDERTRACE_UI_IMAGE` there instead.
+
 ## [0.9.0] - 2026-11-26
 
 ### Security

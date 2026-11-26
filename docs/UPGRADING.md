@@ -44,6 +44,18 @@ or deployment-layout changes require their own rehearsed migration. Normal
 Use the upgrade command for code updates; rebuilding a mutable tag with `--build`
 bypasses the retained image selection.
 
+### The HiveXUI ui image
+
+Each release pins a HiveXUI image by digest in `compose.yaml`. The upgrade compares it with
+the image the installation's `ui` service runs. When they differ, it pulls the release's
+image before the downtime starts, records it as `CINDERTRACE_UI_IMAGE` in `.env` and
+restarts `ui` with the API and gateway; the upgrade only completes once `ui` is healthy
+on that image. A rollback restores the previous `.env` and starts `ui` on its previous
+image. An installation whose `ui` runs an image other than `ghcr.io/cheftaco/hivexui`
+(a mirror or its own build) keeps it; the record says `kept-custom`, and you update that
+image yourself. The dry run and the final summary report the decision as `ui`
+(`updated`, `unchanged` or `kept-custom`).
+
 To build and inspect the plan before downtime:
 
 ```sh
