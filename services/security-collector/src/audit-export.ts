@@ -298,6 +298,20 @@ function valid(schema: { safeParse(value: unknown): { success: boolean } }, valu
   return value !== undefined && schema.safeParse(value).success ? value : undefined;
 }
 
+const FINDING_SEVERITIES = new Set<SecurityFusionSeverity>(["critical", "high", "medium", "low"]);
+/**
+ * An Embermend finding (`finding.observed`, `finding.recurred`) carries the finding's own
+ * severity in `details.severity`; it is the event's severity, in place of the action terms.
+ * `unknown` or a missing value falls back to the action-based severity.
+ */
+export function findingSeverity(record: HiveAuditRecord): SecurityFusionSeverity | undefined {
+  if (record.product !== "embermend" || !record.action.startsWith("finding.")) return undefined;
+  const value = record.details["severity"];
+  return typeof value === "string" && FINDING_SEVERITIES.has(value as SecurityFusionSeverity)
+    ? (value as SecurityFusionSeverity)
+    : undefined;
+}
+
 /** Map one HiveAuditRecord v1 to a Cindertrace event. */
 export function auditRecordEvent(record: HiveAuditRecord): SecurityFusionEvent {
   const source = record.product;
@@ -324,6 +338,8 @@ export function auditRecordEvent(record: HiveAuditRecord): SecurityFusionEvent {
   // The subject names the agent the action concerns, as other agent entities do.
   if (subjectActorId) addAgent(agentEntityValue.actor(subjectActorId));
   else if (subjectAgentRef) addAgent(agentEntityValue.agentRef(subjectAgentRef));
+  // Embermend names the Magnus node a finding was observed on or an execution ran on.
+  if (source === "embermend" && subjectNodeId) entities.push({ type: "host", value: subjectNodeId });
   const actorName = label ?? record.actor.id;
   const target =
     record.target?.type || record.target?.id
@@ -336,7 +352,7 @@ export function auditRecordEvent(record: HiveAuditRecord): SecurityFusionEvent {
     sourceEventId: record.id,
     kind: `${source}.${record.action}`.slice(0, 160),
     observedAt: new Date(record.occurredAt).toISOString(),
-    severity: auditSeverity(record.action, record.outcome),
+    severity: findingSeverity(record) ?? auditSeverity(record.action, record.outcome),
     confidence: 0.9,
     summary:
       `${productLabel[source]} ${record.action} by ${record.actor.type} ${actorName}${target}` +
