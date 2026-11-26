@@ -476,7 +476,15 @@ securityFusionRouter.post("/ingest/source-status", async (c) => {
 });
 
 securityFusionRouter.use("*", authMiddleware);
-securityFusionRouter.use("*", requirePermission("security-fusion:read"));
+// VIEWER may read only the summary pages; every other route needs case read access.
+const summaryReads = new Set(["/overview", "/sources", "/policies"]);
+securityFusionRouter.use("*", (c, next) =>
+  requirePermission(
+    c.req.method === "GET" && summaryReads.has(c.req.path.replace(/^\/api\/v1\/security-fusion/, ""))
+      ? "security-fusion:summary"
+      : "security-fusion:read",
+  )(c, next),
+);
 registerLabRoutes(securityFusionRouter);
 securityFusionRouter.get("/audit", requireRole("ADMIN"), async (c) => {
   const date = c.req.query("date");
@@ -492,15 +500,17 @@ securityFusionRouter.get("/audit", requireRole("ADMIN"), async (c) => {
 
 securityFusionRouter.get("/overview", async (c) => {
   const db = getDb();
+  // A VIEWER gets the counts and source health, not the case titles and summaries.
+  const casesVisible = hasPermission(getUser(c), "security-fusion:read");
   const [openCases, sources, bySeverity] = await Promise.all([
-    db.securityFusionCase.findMany({
+    casesVisible ? db.securityFusionCase.findMany({
       where: {
         archivedAt: null,
         status: { notIn: ["resolved", "false_positive"] },
       },
       orderBy: { lastSeenAt: "desc" },
       take: 12,
-    }),
+    }) : Promise.resolve([]),
     db.securityFusionSourceState.findMany({ orderBy: { source: "asc" } }),
     db.securityFusionCase.groupBy({
       by: ["severity"],

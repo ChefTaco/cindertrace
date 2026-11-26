@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The VIEWER role (an Oathweave `cindertrace:view` link) can now read the summary: `/overview` (severity counts and source health; its `openCases` list stays empty for VIEWER), `/sources` and `/policies`. Before, every route answered 403. Cases, events, entities and the inbox feed still need OPERATOR.
+- The read automation credential is no longer offered `GET /evidence`, which its OPERATOR role was always refused with 403.
+
+### Fixed
+
+- A malformed `SECURITY_PLUGIN_READ_DIGESTS_JSON` (it must map names to lowercase-hex SHA-256 digests) or `CINDERTRACE_OATHWEAVE_IDENTITIES_JSON` now stops the API at startup instead of failing every request with a 500. Both are parsed once per value instead of on every request.
+
+### Upgrade notes
+
+- Check `SECURITY_PLUGIN_READ_DIGESTS_JSON` and `CINDERTRACE_OATHWEAVE_IDENTITIES_JSON` before upgrading: an invalid value now stops the API.
+
 ### Security
 
 - The API no longer accepts the retired standalone console's HS256 bearer tokens (issuer `cindertrace-console`, signed with `SECURITY_CONSOLE_TOKEN_SECRET`). Anyone who could read `.env` could mint a 60-second ADMIN token with it, and nothing shipped issues them any more. `SECURITY_CONSOLE_TOKEN_SECRET` is no longer required or read. The demo script now signs in as the local administrator; the in-process test suites use a test-only bearer secret (`CINDERTRACE_TEST_BEARER_SECRET`) that the API server refuses at startup.

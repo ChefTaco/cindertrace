@@ -81,3 +81,9 @@ it("accepts local approval under its new and legacy names only", () => {
     expect(() => validateRuntimeConfig({ ...core, SECURITY_APPROVAL_MODE: mode })).not.toThrow();
   expect(() => validateRuntimeConfig({ ...core, SECURITY_APPROVAL_MODE: "externel" })).toThrow(/SECURITY_APPROVAL_MODE/);
 });
+it("refuses malformed automation credentials and identity links at startup", () => {
+  expect(() => validateRuntimeConfig({ ...core, SECURITY_PLUGIN_READ_DIGESTS_JSON: "{\"agent\":" })).toThrow(/SECURITY_PLUGIN_READ_DIGESTS_JSON/);
+  expect(() => validateRuntimeConfig({ ...core, CINDERTRACE_OATHWEAVE_IDENTITIES_JSON: "[{" })).toThrow();
+  expect(() => validateRuntimeConfig({ ...core, CINDERTRACE_OATHWEAVE_IDENTITIES_JSON: JSON.stringify([{ issuer: "https://id.example.com", subject: "s", localUserId: "u", role: "OWNER" }]) })).toThrow();
+  expect(() => validateRuntimeConfig({ ...core, CINDERTRACE_OATHWEAVE_IDENTITIES_JSON: JSON.stringify([{ issuer: "https://id.example.com", subject: "s", localUserId: "user-1", role: "VIEWER" }]) })).not.toThrow();
+});
