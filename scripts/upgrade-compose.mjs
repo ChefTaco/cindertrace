@@ -24,6 +24,30 @@ const probe = readFileSync(
   "utf8",
 );
 const appServices = ["api", "gateway", "collector", "migrate"];
+const releaseUi = /^ghcr\.io\/cheftaco\/hivexui(?::[A-Za-z0-9._-]+)?@sha256:[a-f0-9]{64}$/;
+/** Remove keys from an env file's text, keeping every other line as written. */
+export function withoutKeys(text, keys) {
+  return text
+    .split("\n")
+    .filter((line) => {
+      const m = /^(?:export )?([A-Z][A-Z0-9_]*)=/.exec(line);
+      return !m || !keys.includes(m[1]);
+    })
+    .join("\n");
+}
+/**
+ * Whether an upgrade moves the ui service to the release's HiveXUI image. A release pins
+ * HiveXUI by digest; an installation that runs another image (a mirror or own build) keeps it.
+ */
+export function uiImagePlan(current, candidate) {
+  assert(
+    releaseUi.test(candidate ?? ""),
+    "The release must pin its HiveXUI ui image by digest",
+  );
+  if (current === candidate) return { decision: "unchanged" };
+  if (!/^ghcr\.io\/cheftaco\/hivexui[:@]/.test(current ?? "")) return { decision: "kept-custom" };
+  return { decision: "updated", image: candidate };
+}
 export class ComposeInstallation {
   constructor(root, run) {
     this.root = resolve(root);
@@ -170,6 +194,10 @@ export class ComposeInstallation {
       binary: true,
     });
     await this.run(["tar", "-xf", "-", "-C", source], { input: archive });
+    // The candidate's own defaults: without the installation's CINDERTRACE_UI_IMAGE, so the
+    // HiveXUI image the release pins shows through.
+    const candidateEnv = join(record.directory, "candidate-defaults.env");
+    atomicPrivate(candidateEnv, withoutKeys(this.originalEnv, ["CINDERTRACE_UI_IMAGE"]));
     const candidate = JSON.parse(
       await this.run([
         "docker",
@@ -177,7 +205,7 @@ export class ComposeInstallation {
         "--project-directory",
         this.root,
         "--env-file",
-        this.envFile,
+        candidateEnv,
         "-f",
         join(source, "compose.yaml"),
         "--profile",
@@ -224,10 +252,22 @@ export class ComposeInstallation {
     );
     record.image = this.image;
     record.imageId = image.Id;
+    const ui = uiImagePlan(this.before.services.ui?.image, candidate.services.ui?.image);
+    record.uiImageDecision = ui.decision;
+    if (ui.image) {
+      // Pulled before the pause, so the swap needs no registry access during downtime.
+      await this.run(["docker", "pull", ui.image]);
+      const [pulled] = JSON.parse(
+        await this.run(["docker", "image", "inspect", ui.image]),
+      );
+      record.uiImage = ui.image;
+      record.uiImageId = pulled.Id;
+      record.previousUiImage = this.before.services.ui.image;
+    }
     const selectionEnv = join(record.directory, "candidate-selection.env");
     atomicPrivate(
       selectionEnv,
-      patchEnvironment(this.originalEnv, { CINDERTRACE_IMAGE: this.image }),
+      patchEnvironment(this.originalEnv, this.imageSelection(record)),
     );
     const configArgs = this.args();
     configArgs[configArgs.indexOf("--env-file") + 1] = selectionEnv;
@@ -246,6 +286,12 @@ export class ComposeInstallation {
         selected.services[n].image,
         this.image,
         "A Compose override pins an application image; use CINDERTRACE_IMAGE in that override",
+      );
+    if (record.uiImage)
+      assert.equal(
+        selected.services.ui.image,
+        record.uiImage,
+        "The installation's compose.yaml or override pins the ui image; use CINDERTRACE_UI_IMAGE there",
       );
     record.previousImage = this.oldImage;
     record.previousEnvironment = this.originalEnv;
@@ -489,13 +535,24 @@ export class ComposeInstallation {
       ? {}
       : { CINDERTRACE_TRUSTED_PROXIES: "gateway" };
   }
+  /** The image settings an upgrade writes to `.env`: the application and, when it changes, HiveXUI. */
+  imageSelection(record) {
+    return {
+      CINDERTRACE_IMAGE: record.image,
+      ...(record.uiImage ? { CINDERTRACE_UI_IMAGE: record.uiImage } : {}),
+    };
+  }
+  /** Services an activation or rollback (re)starts; `ui` only when the upgrade swaps its image. */
+  startServices(record) {
+    return record.uiImage ? ["ui", "api", "gateway"] : ["api", "gateway"];
+  }
   async activate(record) {
     atomicPrivate(
       this.envFile,
       patchEnvironment(this.originalEnv, {
         ...this.releaseDefaults(),
         ...pausedEnvironment({}),
-        CINDERTRACE_IMAGE: record.image,
+        ...this.imageSelection(record),
       }),
       this.envOwner,
     );
@@ -509,12 +566,11 @@ export class ComposeInstallation {
       "--wait",
       "--wait-timeout",
       "120",
-      "api",
-      "gateway",
+      ...this.startServices(record),
     ]);
   }
   async healthy(record) {
-    for (const n of ["api", "gateway"]) {
+    for (const n of ["api", "gateway", "ui"]) {
       const id = (await this.compose(["ps", "-q", n])).trim();
       const [c] = JSON.parse(await this.run(["docker", "inspect", id]));
       assert.equal(
@@ -522,12 +578,14 @@ export class ComposeInstallation {
         "healthy",
         "Application health failed",
       );
-      if (record)
+      if (record && n !== "ui")
         assert.equal(
           c.Image,
           record.imageId,
           "Application image differs from selected candidate",
         );
+      if (record?.uiImage && n === "ui")
+        assert.equal(c.Image, record.uiImageId, "ui image differs from the release's HiveXUI image");
     }
   }
   async resume(record) {
@@ -535,7 +593,7 @@ export class ComposeInstallation {
       this.envFile,
       patchEnvironment(this.originalEnv, {
         ...this.releaseDefaults(),
-        CINDERTRACE_IMAGE: record.image,
+        ...this.imageSelection(record),
       }),
     );
     await this.compose([
@@ -548,8 +606,7 @@ export class ComposeInstallation {
       "--wait",
       "--wait-timeout",
       "120",
-      "api",
-      "gateway",
+      ...this.startServices(record),
     ]);
     if (record.collectorEnabled)
       await this.compose([
@@ -585,8 +642,7 @@ export class ComposeInstallation {
         "--wait",
         "--wait-timeout",
         "120",
-        "api",
-        "gateway",
+        ...this.startServices(record),
       ],
       { file: record.beforeFile },
     );

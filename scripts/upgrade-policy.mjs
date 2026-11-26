@@ -130,7 +130,7 @@ export function patchEnvironment(text, updates) {
       const value = pending[m[1]];
       delete pending[m[1]];
       assert(
-        /^[A-Za-z0-9:._/-]+$/.test(String(value)),
+        /^[A-Za-z0-9:._/@-]+$/.test(String(value)),
         "Managed environment values must be literal",
       );
       return m[1] + "=" + String(value);
@@ -138,7 +138,7 @@ export function patchEnvironment(text, updates) {
   for (const [key, value] of Object.entries(pending)) {
     assert(
       /^[A-Z][A-Z0-9_]*$/.test(key) &&
-        /^[A-Za-z0-9:._/-]+$/.test(String(value)),
+        /^[A-Za-z0-9:._/@-]+$/.test(String(value)),
     );
     lines.push(key + "=" + String(value));
   }

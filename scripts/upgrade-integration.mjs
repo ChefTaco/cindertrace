@@ -52,6 +52,16 @@ async function run(
 const dc = (...args) => run(["docker", "compose", ...args]);
 const command = (...args) =>
   run([process.execPath, join(source, "scripts/upgrade.mjs"), ...args]);
+// The fixture starts on an older HiveXUI so the upgrade has a ui image to swap and roll back.
+const previousUi =
+  "ghcr.io/cheftaco/hivexui@sha256:8407f94d12d9de5d844718f25f15b7728709380d932cc655466773becb338a99";
+async function uiImage() {
+  const id = (await dc("ps", "-q", "ui")).output.trim();
+  assert(id, "ui is not running");
+  const [c] = JSON.parse((await run(["docker", "inspect", id])).output);
+  assert.equal(c.State.Health?.Status, "healthy");
+  return c.Config.Image;
+}
 function uiRequest(path, { method = "GET", cookie, body } = {}) {
   return new Promise((done, reject) => {
     const req = https.request("https://localhost:35444" + path, {
@@ -108,7 +118,12 @@ try {
   env.DASHBOARD_PUBLIC_ORIGIN = "https://localhost:35444";
   env.CINDERTRACE_IMAGE =
     process.env.CINDERTRACE_UPGRADE_BASE_IMAGE ?? "cindertrace:local";
+  env.CINDERTRACE_UI_IMAGE = previousUi;
   writeFileSync(join(fixture, ".env"), renderEnvironment(env), { mode: 0o600 });
+  const releaseUi = /ghcr\.io\/cheftaco\/hivexui:[0-9.]+@sha256:[a-f0-9]{64}/.exec(
+    readFileSync(join(fixture, "compose.yaml"), "utf8"),
+  )[0];
+  assert.notEqual(releaseUi, previousUi);
   writeFileSync(
     join(fixture, "compose.override.yaml"),
     'services:\n  gateway:\n    ports: !override ["127.0.0.1:35444:3444"]\n',
@@ -116,6 +131,7 @@ try {
   console.log("Starting isolated upgrade fixture");
   await dc("up", "-d", "--no-build", "--wait", "--wait-timeout", "120");
   started = true;
+  assert.equal(await uiImage(), previousUi);
   const password = readFileSync(join(fixture, "state/initial-credentials.txt"), "utf8")
     .match(/^Password: (.+)$/m)[1];
   const login = await uiRequest("/api/cindertrace/auth/local/login", {
@@ -139,7 +155,13 @@ try {
       .output,
   );
   assert.equal(planned.status, "ready");
+  assert.equal(planned.ui, "updated");
   await command("resume", "--id", planned.id, "--project-dir", fixture);
+  assert.equal(await uiImage(), releaseUi, "The upgrade restarts ui on the release's HiveXUI");
+  assert.equal(
+    readEnvironment(readFileSync(join(fixture, ".env"), "utf8")).CINDERTRACE_UI_IMAGE,
+    releaseUi,
+  );
   const upgraded = JSON.parse(
     (await command("status", "--id", planned.id, "--project-dir", fixture))
       .output,
@@ -170,6 +192,11 @@ try {
     "--project-dir",
     fixture,
     "--retain-current-state",
+  );
+  assert.equal(await uiImage(), previousUi, "Rollback restores the previous ui image");
+  assert.equal(
+    readEnvironment(readFileSync(join(fixture, ".env"), "utf8")).CINDERTRACE_UI_IMAGE,
+    previousUi,
   );
   // An additive migration followed by an interrupted activation must be safely rerunnable.
   const migration = "20261104000000_upgrade_rehearsal";
@@ -246,6 +273,7 @@ try {
     (await command("status", "--id", retryId, "--project-dir", fixture)).output,
   );
   assert.equal(result.phase, "complete");
+  assert.equal(await uiImage(), releaseUi);
   await command(
     "rollback",
     "--id",
@@ -264,6 +292,7 @@ try {
     "import {getDb,disconnectDb} from './services/security-fusion/dist/db/index.js';const d=getDb();const rows=await d.securityFusionEvidence.findMany();if(!rows.length||rows.some(x=>x.integrityStatus.startsWith('quarantined')))throw Error('Evidence lost');console.log(JSON.stringify({evidence:rows.length,migrations:Number((await d.$queryRaw`SELECT count(*)::int n FROM _prisma_migrations WHERE migration_name='20261104000000_upgrade_rehearsal'`)[0].n)}));await disconnectDb();",
   );
   assert.equal(JSON.parse(read.output.trim().split("\n").at(-1)).migrations, 1);
+  assert.equal(await uiImage(), previousUi);
   assert.equal((await uiRequest("/api/cindertrace/auth/local/session", { cookie })).status, 200);
   assert.equal((await uiRequest("/api/cindertrace/auth/local/logout", { method: "POST", cookie })).status, 200);
   assert.equal((await uiRequest("/api/cindertrace/auth/local/session", { cookie })).status, 401);
@@ -278,6 +307,7 @@ try {
       staleRollbackRefused: true,
       evidencePreserved: true,
       sessionPreservedAndRevoked: true,
+      uiImageSwappedAndRolledBack: 2,
     }),
   );
 } finally {

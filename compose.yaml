@@ -52,8 +52,9 @@ services:
   # HiveXUI in local mode: Cindertrace pages only, signed in by the API's own local sign-in.
   # Static files only; it is reached through the gateway and has no published port.
   ui:
-    # HiveXUI 0.12.0 (the digest Hive 3.14.3's signed suite manifest pins).
-    image: '${CINDERTRACE_UI_IMAGE:-ghcr.io/cheftaco/hivexui@sha256:8407f94d12d9de5d844718f25f15b7728709380d932cc655466773becb338a99}'
+    # HiveXUI 0.12.1, pinned by digest. `npm run upgrade` moves an installation to the image a
+    # release pins here (recorded as CINDERTRACE_UI_IMAGE in .env).
+    image: '${CINDERTRACE_UI_IMAGE:-ghcr.io/cheftaco/hivexui:0.12.1@sha256:4d2eadad9cd9fa01650518feeccaf3351e98390bc90fca2bd35b9239e41061ec}'
     user: '101:101'
     restart: unless-stopped
     read_only: true
