@@ -4,6 +4,7 @@ import { HttpError } from "../middleware/error-handler.js";
 import { validateStoredContainmentPlan } from "./senti-containment-approval.js";
 import { dispatchAvailable, responseConfigured } from "../config/runtime.js";
 import { approvalMode } from "../config/settings.js";
+import { requireDistinctApprover } from "../config/approval-policy.js";
 export { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
 import { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
 export async function decideAsAdmin(
@@ -57,6 +58,7 @@ export async function decideAsAdmin(
         "APPROVAL_ALREADY_USED",
         "Approval is expired or already handled",
       );
+    if (decision === "approve") requireDistinctApprover(actorId, [action.requestedBy, approval.requestedBy]);
     const plan = validateStoredContainmentPlan(action, approval);
     if (
       plan.plan_sha256 !== body.planSha256 ||

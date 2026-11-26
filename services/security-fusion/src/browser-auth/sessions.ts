@@ -23,7 +23,10 @@ const Session = z.object({
   iat: z.number(),
   exp: z.number(),
 });
-export type BrowserSession = z.infer<typeof Session>;
+export type BrowserSession = z.infer<typeof Session> & {
+  /** Oathweave sign-in time (ms) for identity sessions, from the identity provider. */
+  authenticatedAt?: number;
+};
 export type SessionStore = Pick<Redis, "eval" | "mget" | "set" | "del">;
 // Same atomic limit, expiry clock and keys as runtime-local-sessions.mjs. Existing
 // session and revocation records are adopted in place, never reseeded or merged.
@@ -165,7 +168,7 @@ export class BrowserSessions {
         const identity=await this.verifyIdentity(this.openCredential(record.slice(generation.length+1),session.sessionId));
         if(identity.issuer!==session.identityIssuer||identity.subject!==session.subject)return null;
         const linked=linkedSecurityIdentity(identity,this.env.CINDERTRACE_OATHWEAVE_IDENTITIES_JSON);if(linked.userId!==session.userId)return null;
-        return {...session,role:linked.role};
+        return {...session,role:linked.role,...(identity.authenticatedAt!==undefined?{authenticatedAt:identity.authenticatedAt}:{})};
       } catch {return null;}
     }
     // Only local administrator sessions remain; any other provider is refused.

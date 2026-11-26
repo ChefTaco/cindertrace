@@ -1,4 +1,5 @@
 import { approvalMode } from "../config/settings.js";
+import { requireRecentAuthentication } from "../config/approval-policy.js";
 import { registerLabRoutes } from "./investigation-lab.js";
 import { decideAsAdmin } from "../services/approval-decisions.js";
 import { dispatchAvailable, responseConfigured } from "../config/runtime.js";
@@ -28,7 +29,7 @@ import {
 } from "../middleware/auth.js";
 import { HttpError } from "../middleware/error-handler.js";
 import { bodyLimitMiddleware } from "../middleware/body-limit.js";
-import { queryAuditEvents, logAuditEvent } from "../services/audit-service.js";
+import { queryAuditEvents, auditCommitted } from "../services/audit-service.js";
 import {
   ingestSecurityFusionBatch,
   preserveEvidence,
@@ -578,7 +579,7 @@ securityFusionRouter.post(
         "Collector is missing or already revoked",
       );
     }
-    await logAuditEvent({
+    await auditCommitted({
       action: "security_fusion.collector.revoke",
       actorId: getUser(c).userId,
       targetType: "security-fusion-collector",
@@ -1026,7 +1027,7 @@ securityFusionRouter.post(
       c.req.param("eventId")!,
       getUser(c).userId,
     );
-    await logAuditEvent({
+    await auditCommitted({
       action: "security_fusion.evidence.preserve",
       actorId: getUser(c).userId,
       targetType: "security-case",
@@ -1134,7 +1135,7 @@ securityFusionRouter.post("/approval-decisions", async (c) => {
   requireSentiBridge(c);
   const result = await recordContainmentApproval(await jsonBody(c));
   if (result.outbox_id) void dispatchSecurityFusionOutbox().catch(() => undefined);
-  await logAuditEvent({
+  await auditCommitted({
     action: `security_fusion.action.external_${result.decision}`,
     actorId: "service:senti-approval-bridge",
     targetType: "security-action",
@@ -1256,7 +1257,7 @@ securityFusionRouter.post(
         approvalExpiresAt: expiresAt,
       };
     });
-    await logAuditEvent({
+    await auditCommitted({
       action: "security_fusion.action.request",
       actorId: getUser(c).userId,
       targetType: "security-action",
@@ -1280,8 +1281,9 @@ securityFusionRouter.post(
 
 for (const decision of ["approve", "reject"] as const) {
   securityFusionRouter.post(`/actions/:id/${decision}`, requireRole("ADMIN"), async c => {
+    if (decision === "approve") requireRecentAuthentication(getUser(c));
     const result = await decideAsAdmin(c.req.param("id")!, getUser(c).userId, decision, await c.req.json().catch(() => null));
-    await logAuditEvent({ action: `security_fusion.action.admin_${decision}`, actorId: getUser(c).userId, targetType: "security-action", targetId: result.actionId, details: { decisionId: result.id, executionId: result.executionId } });
+    await auditCommitted({ action: `security_fusion.action.admin_${decision}`, actorId: getUser(c).userId, targetType: "security-action", targetId: result.actionId, details: { decisionId: result.id, executionId: result.executionId } });
     return c.json({ success: true, data: result });
   });
 }
@@ -1304,6 +1306,17 @@ securityFusionRouter.post(
     });
   },
 );
+
+export const RELEASE_DISPATCH_WAIT_MS = 10_000;
+/** Wait for `work` (ignoring its outcome) or `ms`, whichever comes first. */
+export async function settleWithin(work: Promise<unknown>, ms: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([
+    work.catch(() => undefined),
+    new Promise((resolve) => { timer = setTimeout(resolve, ms); }),
+  ]);
+  clearTimeout(timer);
+}
 
 securityFusionRouter.post(
   "/actions/:id/release",
@@ -1344,7 +1357,9 @@ securityFusionRouter.post(
       });
       return { action, outbox };
     });
-    void dispatchSecurityFusionOutbox().catch(() => undefined);
+    // Give the dispatcher a bounded chance to send the release, so the reply and the case
+    // activity report the real command; a slow bridge leaves it release_pending.
+    await settleWithin(dispatchSecurityFusionOutbox(), RELEASE_DISPATCH_WAIT_MS);
     const dispatched = await getDb().securityFusionCommandOutbox.findUnique({
       where: { id: claimed.outbox.id },
     });

@@ -5,6 +5,7 @@ import { createInterface } from "node:readline";
 import path from "node:path";
 import { nanoid } from "nanoid";
 import type { AuditAction } from "../types/index.js";
+import { incMetric } from "../routes/metrics.js";
 
 /** Keys whose values must never appear in audit logs or console output. Matched without regard to case. */
 const SENSITIVE_KEYS = new Set(
@@ -247,6 +248,27 @@ export async function logAuditEvent(params: AuditLogParams): Promise<void> {
   const operation = appendQueue.then(() => appendAuditEvent(params));
   appendQueue = operation.catch(() => undefined);
   return operation;
+}
+
+// Exported from the first scrape, so an alert on it never sees a missing series.
+incMetric("auditAppendFailures", 0);
+/**
+ * Audit a state change that has already committed. The change stands whatever happens to
+ * the audit file, so an append failure must not turn it into an error: the client would
+ * retry and be refused (the approval was used, the evidence preserved). The failure is
+ * reported instead, on stderr without the entry's details and as
+ * `security_fusion_audit_append_failures` in /metrics, for operators to alert on. The
+ * case activity written in the same transaction still records the change.
+ */
+export async function auditCommitted(params: AuditLogParams): Promise<boolean> {
+  try {
+    await logAuditEvent(params);
+    return true;
+  } catch {
+    incMetric("auditAppendFailures");
+    console.error(`Audit append failed after a committed change (${params.action}); check AUDIT_LOG_DIR`);
+    return false;
+  }
 }
 
 /** List available day keys (YYYY-MM-DD) that have audit log files. */

@@ -6,6 +6,7 @@ import { validateLabIsolation } from "./lab-isolation.js";
 import { validateAuthLimitsConfig } from "./auth-limits.js";
 import { parseTrustedProxies } from "../utils/client-address.js";
 import { setting, validateSettingAliases } from "./settings.js";
+import { approvalPolicy } from "./approval-policy.js";
 /** Validate enabled capabilities without requiring any optional product. */
 import { configuredCollectorCredentials } from "../services/security-fusion-ingest.js";
 export function responseConfigured(
@@ -27,6 +28,7 @@ export function validateRuntimeConfig(
   validateLabIsolation(env);
   validateAuthLimitsConfig(env);
   parseTrustedProxies(env["CINDERTRACE_TRUSTED_PROXIES"]);
+  approvalPolicy(env);
   if(browserAuthEnabled(env)){
     credentials(env);
     browserSessionSecret(env);

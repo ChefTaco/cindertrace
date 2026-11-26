@@ -1,5 +1,5 @@
 import { getDb } from "../db/index.js";
-import { logAuditEvent } from "./audit-service.js";
+import { auditCommitted } from "./audit-service.js";
 import { securityFusionActionSources } from "./security-fusion-actions.js";
 
 /** Lifetime of a preview and of an approval request (the preview's own expiresAt). */
@@ -58,7 +58,7 @@ function expired(
 }
 
 async function audit(row: Cancelled, reason: "cancelled" | "expired", actorId: string) {
-  await logAuditEvent({
+  await auditCommitted({
     action: `security_fusion.action.${reason === "expired" ? "expire" : "cancel"}`,
     actorId,
     targetType: "security-action",

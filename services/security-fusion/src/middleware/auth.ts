@@ -55,7 +55,9 @@ export async function authMiddleware(c: Context<AppVariables>, next: Next) {
     try {session=await (await browserSessions()).verify(getCookie(c, COOKIE_NAME)!);}
     catch {throw new HttpError(503,'AUTH_UNAVAILABLE','Browser session verification is unavailable');}
     if(!session)throw new HttpError(401,'UNAUTHORIZED','Invalid or revoked browser session');
-    c.set('user',{userId:session.userId??setting(process.env,'CINDERTRACE_ADMIN_ACCOUNT_ID')??session.username,email:'',role:session.role,iat:session.iat,exp:session.exp});
+    // A local session starts at sign-in; an identity session carries the provider's sign-in time.
+    const authenticatedAt=session.provider==='oathweave'?session.authenticatedAt:session.iat*1000;
+    c.set('user',{userId:session.userId??setting(process.env,'CINDERTRACE_ADMIN_ACCOUNT_ID')??session.username,email:'',role:session.role,iat:session.iat,exp:session.exp,...(authenticatedAt!==undefined?{authenticatedAt}:{})});
     await next(); return;
   }
   const registry = JSON.parse(
