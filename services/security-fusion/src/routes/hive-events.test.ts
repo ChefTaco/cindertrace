@@ -29,7 +29,7 @@ const { errorHandler } = await import("../middleware/error-handler.js");
 async function token(role: string) {
   return new SignJWT({ userId: `user-${role.toLowerCase()}`, role })
     .setProtectedHeader({ alg: "HS256" })
-    .setIssuer("cindertrace-console")
+    .setIssuer("cindertrace-test")
     .setAudience("cindertrace-api")
     .setIssuedAt()
     .setExpirationTime("60s")
@@ -50,7 +50,7 @@ async function get(path: string, authorization?: string) {
 }
 
 beforeEach(() => {
-  vi.stubEnv("SECURITY_CONSOLE_TOKEN_SECRET", "x".repeat(64));
+  vi.stubEnv("CINDERTRACE_TEST_BEARER_SECRET", "x".repeat(64));
   const opened = {
     id: "activity-1",
     caseId: "case-1",

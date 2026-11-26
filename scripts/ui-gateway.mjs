@@ -1,5 +1,5 @@
 // HiveXUI gateway for standalone and lab installations. It is the only published service:
-// TLS at DASHBOARD_PUBLIC_ORIGIN, HiveXUI's static files from the internal `ui` service, and
+// TLS at CINDERTRACE_PUBLIC_ORIGIN, HiveXUI's static files from the internal `ui` service, and
 // /api/cindertrace/* to the API's /api/v1/*. It holds no product secret and adds no identity:
 // the API authenticates every request itself from its own `cindertrace_session` cookie.
 // It appends the address it received each API request from to X-Forwarded-For; the API

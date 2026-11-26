@@ -2,14 +2,22 @@
 
 ## [Unreleased]
 
+### Security
+
+- The API no longer accepts the retired standalone console's HS256 bearer tokens (issuer `cindertrace-console`, signed with `SECURITY_CONSOLE_TOKEN_SECRET`). Anyone who could read `.env` could mint a 60-second ADMIN token with it, and nothing shipped issues them any more. `SECURITY_CONSOLE_TOKEN_SECRET` is no longer required or read. The demo script now signs in as the local administrator; the in-process test suites use a test-only bearer secret (`CINDERTRACE_TEST_BEARER_SECRET`) that the API server refuses at startup.
+
 ### Changed
 
 - Fresh Compose installations run HiveXUI 0.12.1, up from 0.12.0. `compose.yaml` names the version next to the digest.
 - `npm run upgrade` now moves the `ui` service to the HiveXUI image the release pins. It pulls the image before the downtime, writes it to `.env` as `CINDERTRACE_UI_IMAGE`, restarts `ui` with the API and gateway and waits for it to be healthy; a rollback restores the previous `ui` image. An installation that runs another `ui` image (a mirror or its own build) keeps it. See [the HiveXUI ui image](docs/UPGRADING.md#the-hivexui-ui-image).
+- Console-era setting names have Cindertrace names: `CINDERTRACE_PUBLIC_ORIGIN`, `CINDERTRACE_ADMIN_USERNAME`, `CINDERTRACE_ADMIN_PASSWORD_HASH`, `CINDERTRACE_ADMIN_PASSWORD`, `CINDERTRACE_ADMIN_ACCOUNT_ID` (each also as `_B64` where it had one) and `SECURITY_APPROVAL_MODE=local`. The `DASHBOARD_*` names and `SECURITY_APPROVAL_MODE=console` keep working; the API refuses to start when both spellings of a setting disagree, or when `SECURITY_APPROVAL_MODE` is not `local`, `console` or `external`. `npm run init` writes the new names and no longer generates `SECURITY_CONSOLE_TOKEN_SECRET`. See [setting names](docs/INSTALLATION.md#setting-names), which also lists the console-era wire values that stay frozen.
+- New browser sessions carry issuer `cindertrace` and audience `cindertrace-browser` (unless `SESSION_ISSUER`/`SESSION_AUDIENCE` are set). Sessions issued with the old `cindertrace-console` values stay valid until they expire.
 
 ### Upgrade notes
 
 - The managed upgrade now restarts `ui` when the release pins a different HiveXUI image, and writes `CINDERTRACE_UI_IMAGE` to `.env`. A `compose.override.yaml` that sets the `ui` image itself stops the upgrade; set `CINDERTRACE_UI_IMAGE` there instead.
+- Remove `SECURITY_CONSOLE_TOKEN_SECRET` from `.env` when convenient; it is ignored. Any script of your own that minted console tokens with it must sign in instead (local sign-in or Oathweave).
+- A `SECURITY_APPROVAL_MODE` value other than `local`, `console` or `external` now stops the API at startup.
 
 ## [0.9.0] - 2026-11-26
 

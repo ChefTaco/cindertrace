@@ -12,6 +12,7 @@ import { oathweaveAuthentication } from './oathweave.js';
 import { getCookie } from 'hono/cookie';
 import { browserAuthEnabled, browserSessions, COOKIE_NAME } from '../browser-auth/sessions.js';
 import { exactBrowserOrigin } from '../browser-auth/origin.js';
+import { setting } from '../config/settings.js';
 /** Constant-time string equality; strings of different byte length are unequal. */
 export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqualString(a, b);
@@ -23,6 +24,28 @@ export function tokenMatches(
 ): boolean {
   return matchesSha256Digest(token, digest);
 }
+/**
+ * Short-lived HS256 bearers for the in-process test suites only (`scripts/test-bearer.mjs`).
+ * They are honoured only while CINDERTRACE_TEST_BEARER_SECRET is set, and the API server
+ * refuses to start with it set, so a running installation never accepts them. They replace
+ * the retired console's `SECURITY_CONSOLE_TOKEN_SECRET` tokens.
+ */
+async function testBearer(token: string): Promise<AuthTokenPayload> {
+  const secret = process.env["CINDERTRACE_TEST_BEARER_SECRET"];
+  if (!secret || secret.length < 32) throw new Error("test bearers disabled");
+  const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+    algorithms: ["HS256"],
+    issuer: "cindertrace-test",
+    audience: "cindertrace-api",
+    maxTokenAge: "180s",
+  });
+  if (
+    typeof payload["userId"] !== "string" ||
+    !["ADMIN", "OPERATOR", "VIEWER"].includes(String(payload["role"]))
+  )
+    throw new Error("invalid identity");
+  return payload as unknown as AuthTokenPayload;
+}
 export async function authMiddleware(c: Context<AppVariables>, next: Next) {
   const token = c.req.header("Authorization")?.replace(/^Bearer /, "") ?? "";
   if (!token && browserAuthEnabled() && getCookie(c, COOKIE_NAME)) {
@@ -32,7 +55,7 @@ export async function authMiddleware(c: Context<AppVariables>, next: Next) {
     try {session=await (await browserSessions()).verify(getCookie(c, COOKIE_NAME)!);}
     catch {throw new HttpError(503,'AUTH_UNAVAILABLE','Browser session verification is unavailable');}
     if(!session)throw new HttpError(401,'UNAUTHORIZED','Invalid or revoked browser session');
-    c.set('user',{userId:session.userId??process.env.DASHBOARD_ADMIN_ACCOUNT_ID??session.username,email:'',role:session.role,iat:session.iat,exp:session.exp});
+    c.set('user',{userId:session.userId??setting(process.env,'CINDERTRACE_ADMIN_ACCOUNT_ID')??session.username,email:'',role:session.role,iat:session.iat,exp:session.exp});
     await next(); return;
   }
   const registry = JSON.parse(
@@ -88,24 +111,7 @@ export async function authMiddleware(c: Context<AppVariables>, next: Next) {
     catch { throw new HttpError(401, 'UNAUTHORIZED', 'Invalid or unlinked identity session'); }
     if (identity) { c.set('user',identity); await next(); return; }
     try {
-      const secret = process.env["SECURITY_CONSOLE_TOKEN_SECRET"];
-      if (!secret || secret.length < 32) throw new Error("missing secret");
-      const { payload } = await jwtVerify(
-        token,
-        new TextEncoder().encode(secret),
-        {
-          algorithms: ["HS256"],
-          issuer: "cindertrace-console",
-          audience: "cindertrace-api",
-          maxTokenAge: "60s",
-        },
-      );
-      if (
-        typeof payload["userId"] !== "string" ||
-        !["ADMIN", "OPERATOR", "VIEWER"].includes(String(payload["role"]))
-      )
-        throw new Error("invalid identity");
-      c.set("user", payload as unknown as AuthTokenPayload);
+      c.set("user", await testBearer(token));
     } catch {
       throw new HttpError(
         401,

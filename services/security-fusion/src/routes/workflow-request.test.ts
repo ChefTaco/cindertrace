@@ -30,12 +30,12 @@ it('creates one exact response plan without exposing a console approval token or
   fixture.status='previewed';fixture.approval=undefined;
   const workflow='w'.repeat(40),secret='s'.repeat(40);
   vi.stubEnv('SECURITY_PLUGIN_WORKFLOW_TOKEN_SHA256',createHash('sha256').update(workflow).digest('hex'));
-  vi.stubEnv('SECURITY_CONSOLE_TOKEN_SECRET',secret);
+  vi.stubEnv('CINDERTRACE_TEST_BEARER_SECRET',secret);
   const request=(token:string)=>app.request('/api/v1/security-fusion/actions/a1/request',{method:'POST',headers:{Authorization:'Bearer '+token}});
   let response=await request(workflow);expect(response.status).toBe(200);
   expect((await response.json()).data.approvalToken).toBeUndefined();
   expect((await request(workflow)).status).toBe(409);
-  const admin=await new SignJWT({userId:'operator',role:'ADMIN'}).setProtectedHeader({alg:'HS256'}).setIssuer('cindertrace-console').setAudience('cindertrace-api').setIssuedAt().setExpirationTime('60s').sign(new TextEncoder().encode(secret));
+  const admin=await new SignJWT({userId:'operator',role:'ADMIN'}).setProtectedHeader({alg:'HS256'}).setIssuer('cindertrace-test').setAudience('cindertrace-api').setIssuedAt().setExpirationTime('60s').sign(new TextEncoder().encode(secret));
   response=await request(admin);expect(response.status).toBe(409);
   expect(fixture.approval.planJson).toContain('security.containment.service_restart');
   expect(fixture.approval.planSha256).toMatch(/^[a-f0-9]{64}$/);

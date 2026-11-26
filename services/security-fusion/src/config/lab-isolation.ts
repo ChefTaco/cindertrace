@@ -6,7 +6,7 @@ export function validateLabIsolation(env: NodeJS.ProcessEnv): void {
     throw new Error('Lab requires a newly initialized disposable installation');
   if (new URL(env['DATABASE_URL']!).pathname !== `/cindertrace_lab_${id}`)
     throw new Error('Lab requires its dedicated database');
-  if (env['SECURITY_APPROVAL_MODE'] !== 'console') throw new Error('Lab requires local human console approval');
+  if (!['local', 'console'].includes(env['SECURITY_APPROVAL_MODE'] ?? '')) throw new Error('Lab requires SECURITY_APPROVAL_MODE=local');
   for (const key of ['SECURITY_INGEST_ENABLED', 'SECURITY_DISPATCH_ENABLED', 'SECURITY_NOTIFICATIONS_ENABLED', 'SECURITY_FUSION_UDP_ENABLED', 'TAILSCALE_LOCAL_ENABLED'])
     if (env[key] !== 'false') throw new Error(`Lab requires ${key}=false`);
   for (const [key, value] of Object.entries(env))

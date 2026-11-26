@@ -10,8 +10,8 @@ served by the same `ui` and gateway services as a standalone installation
 ([installation](INSTALLATION.md#the-ui-hivexui-in-local-mode)). Sign in with the
 generated local administrator credentials; the API owns the sign-in
 (`CINDERTRACE_BROWSER_AUTH_ENABLED=true`, with the generated
-`DASHBOARD_ADMIN_PASSWORD_HASH_B64`, `SESSION_SECRET`, `REDIS_URL` and
-`DASHBOARD_PUBLIC_ORIGIN`; see [browser authentication](BROWSER_AUTH.md)). Local mode
+`CINDERTRACE_ADMIN_PASSWORD_HASH_B64`, `SESSION_SECRET`, `REDIS_URL` and
+`CINDERTRACE_PUBLIC_ORIGIN`; see [browser authentication](BROWSER_AUTH.md)). Local mode
 needs no Oathweave, Hive or Magnus setting, which lab isolation forbids. Labs initialized
 before 0.8.0 ran the retired console; initialize a new lab instead of upgrading one.
 Operators can investigate, save revisions and advance. Only administrators can

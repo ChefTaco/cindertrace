@@ -79,6 +79,7 @@ test("runtime staging preserves nested versions and licences while excluding opt
       "demo.mjs",
       "lab.mjs",
       "lab-integration.mjs",
+      "test-bearer.mjs",
       "upgrade.mjs",
       "upgrade-policy.mjs",
       "upgrade-probe.mjs",

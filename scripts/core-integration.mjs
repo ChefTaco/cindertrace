@@ -28,7 +28,6 @@ execFileSync(process.execPath, ["scripts/apply-migrations.mjs"], {
 const { app } = await import("../services/security-fusion/dist/server.js");
 const { getDb, disconnectDb } =
   await import("../services/security-fusion/dist/db/index.js");
-const { SignJWT } = await import("jose");
 const db = getDb();
 try {
   await db.securityFusionReceiptChainHead.upsert({
@@ -36,17 +35,8 @@ try {
     create: { id: "security-fusion", chainSequence: 0 },
     update: {},
   });
-  async function token(role) {
-    return new SignJWT({ userId: "fixture-admin", role })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuer("cindertrace-console")
-      .setAudience("cindertrace-api")
-      .setIssuedAt()
-      .setExpirationTime("60s")
-      .sign(
-        new TextEncoder().encode(process.env.SECURITY_CONSOLE_TOKEN_SECRET),
-      );
-  }
+  const { testBearer } = await import("./test-bearer.mjs");
+  const token = (role) => testBearer(role, "fixture-admin");
   const admin = await token("ADMIN"),
     operator = await token("OPERATOR"),
     viewer = await token("VIEWER");

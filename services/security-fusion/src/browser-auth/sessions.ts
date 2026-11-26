@@ -4,6 +4,11 @@ import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
 import { configuredOathweaveVerifier, linkedSecurityIdentity, type OathweaveIdentity } from "../middleware/oathweave.js";
 import { credentials } from "./credentials.js";
+import { setting } from "../config/settings.js";
+// Session tokens carried the retired console's issuer and audience until 0.9.x. New
+// sessions use Cindertrace's own; verification still accepts the old pair while
+// sessions issued before the upgrade (24 hours at most) run out.
+const ISSUER = "cindertrace", AUDIENCE = "cindertrace-browser", LEGACY = "cindertrace-console";
 
 export const COOKIE_NAME = "cindertrace_session",
   SESSION_DURATION = 86400;
@@ -70,6 +75,12 @@ export class BrowserSessions {
   secret(): Uint8Array {
     return browserSessionSecret(this.env);
   }
+  issuer(): string {
+    return this.env.SESSION_ISSUER?.trim() || ISSUER;
+  }
+  audience(): string {
+    return this.env.SESSION_AUDIENCE?.trim() || AUDIENCE;
+  }
   key(username: string): string {
     return `${COOKIE_NAME}:local:${createHmac("sha256", this.secret()).update(username).digest("hex")}`;
   }
@@ -105,11 +116,11 @@ export class BrowserSessions {
       username,
       sessionId: id,
       role: "ADMIN",
-      userId: this.env.DASHBOARD_ADMIN_ACCOUNT_ID ?? username,
+      userId: setting(this.env, "CINDERTRACE_ADMIN_ACCOUNT_ID") ?? username,
     })
       .setProtectedHeader({ alg: "HS256" })
-      .setIssuer(this.env.SESSION_ISSUER?.trim() || "cindertrace-console")
-      .setAudience(this.env.SESSION_AUDIENCE?.trim() || "cindertrace-console")
+      .setIssuer(this.issuer())
+      .setAudience(this.audience())
       .setIssuedAt()
       .setExpirationTime(`${SESSION_DURATION}s`)
       .sign(this.secret());
@@ -130,15 +141,15 @@ export class BrowserSessions {
     const ttl=Math.min(900,Math.floor((identity.expiresAt??0)-Date.now()/1000));if(ttl<1)throw Error("Resource identity expired");
     const id=randomUUID(),key=this.oathweaveKey(identity.issuer,identity.subject);
     await this.store.eval(CREATE_OATHWEAVE,3,`${key}:generation`,`${key}:sessions`,`${key}:session:${id}`,randomUUID(),id,this.sealCredential(token,id),ttl,Math.floor(Date.now()/1000),`${key}:session:`);
-    return {ttl,token:await new SignJWT({username:identity.displayName,userId:linked.userId,role:linked.role,provider:"oathweave",identityIssuer:identity.issuer,subject:identity.subject,sessionId:id}).setProtectedHeader({alg:"HS256"}).setIssuer(this.env.SESSION_ISSUER?.trim()||"cindertrace-console").setAudience(this.env.SESSION_AUDIENCE?.trim()||"cindertrace-console").setIssuedAt().setExpirationTime(`${ttl}s`).sign(this.secret())};
+    return {ttl,token:await new SignJWT({username:identity.displayName,userId:linked.userId,role:linked.role,provider:"oathweave",identityIssuer:identity.issuer,subject:identity.subject,sessionId:id}).setProtectedHeader({alg:"HS256"}).setIssuer(this.issuer()).setAudience(this.audience()).setIssuedAt().setExpirationTime(`${ttl}s`).sign(this.secret())};
   }
   async verify(token: string, checkIdentity = true): Promise<BrowserSession | null> {
     let session: BrowserSession;
     try {
       const { payload } = await jwtVerify(token, this.secret(), {
         algorithms: ["HS256"],
-        issuer: this.env.SESSION_ISSUER?.trim() || "cindertrace-console",
-        audience: this.env.SESSION_AUDIENCE?.trim() || "cindertrace-console",
+        issuer: this.env.SESSION_ISSUER?.trim() || [ISSUER, LEGACY],
+        audience: this.env.SESSION_AUDIENCE?.trim() || [AUDIENCE, LEGACY],
       });
       session = Session.parse(payload);
     } catch {
@@ -157,8 +168,7 @@ export class BrowserSessions {
         return {...session,role:linked.role};
       } catch {return null;}
     }
-    // Legacy console OAuth sessions have an independent encrypted credential
-    // store. They remain on their compatibility path until explicitly migrated.
+    // Only local administrator sessions remain; any other provider is refused.
     if (session.provider || session.username !== credentials(this.env).username)
       return null;
     const key = this.key(session.username);

@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, createHash } from "node:crypto";
-import { SignJWT } from "jose";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 if (process.env.CINDERTRACE_DEMO_CONFIRM !== "isolated-synthetic-installation")
   throw new Error(
     "Demo ingestion requires an explicitly isolated synthetic installation",
@@ -63,15 +64,27 @@ const result = await fetch(
 if (!result.ok) throw new Error(`Demo ingestion HTTP ${result.status}`);
 if (process.argv.includes("--preserve")) {
   const body = await result.json();
-  const token = await new SignJWT({ userId: "synthetic-demo", role: "ADMIN" })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuer("cindertrace-console")
-    .setAudience("cindertrace-api")
-    .setIssuedAt()
-    .setExpirationTime("60s")
-    .sign(new TextEncoder().encode(process.env.SECURITY_CONSOLE_TOKEN_SECRET));
+  // Preservation is an administrator action: sign in as the local administrator, as
+  // HiveXUI does. The password comes from CINDERTRACE_DEMO_ADMIN_PASSWORD or the initial
+  // credentials file that `npm run init` writes.
+  const initial = () =>
+    readFileSync(join(process.env.CINDERTRACE_STATE_DIR ?? "/state", "initial-credentials.txt"), "utf8");
+  const password = process.env.CINDERTRACE_DEMO_ADMIN_PASSWORD ?? /^Password: (.+)$/m.exec(initial())?.[1];
+  const username =
+    process.env.CINDERTRACE_ADMIN_USERNAME ?? process.env.DASHBOARD_ADMIN_USERNAME ?? "admin";
+  const origin = process.env.CINDERTRACE_PUBLIC_ORIGIN ?? process.env.DASHBOARD_PUBLIC_ORIGIN;
+  if (!password || !origin) throw new Error("Local administrator sign-in is not configured");
+  const auth = `${process.env.CINDERTRACE_API_URL}/api/v1/auth/local`;
+  const login = await fetch(auth + "/login", {
+    method: "POST",
+    redirect: "error",
+    headers: { "content-type": "application/json", origin },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!login.ok) throw new Error(`Local sign-in HTTP ${login.status}`);
+  const cookie = login.headers.getSetCookie()[0].split(";")[0];
+  const headers = { cookie, origin };
   for (const id of body.data.caseIds) {
-    const headers = { authorization: `Bearer ${token}` };
     const detail = await fetch(
       `${process.env.CINDERTRACE_API_URL}/api/v1/security-fusion/cases/${id}`,
       { headers, redirect: "error" },
@@ -85,5 +98,6 @@ if (process.argv.includes("--preserve")) {
     if (!preserved.ok)
       throw new Error("Synthetic evidence preservation failed");
   }
+  await fetch(auth + "/logout", { method: "POST", headers, redirect: "error" });
 }
 console.log("Synthetic demo observation ingested. Open Cases in Cindertrace.");

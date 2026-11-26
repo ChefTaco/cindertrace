@@ -62,10 +62,10 @@ for (const role of ["VIEWER", "OPERATOR", "ADMIN"]) {
     vi.stubEnv("MAGNUS_RESPONSE_URL", "https://magnus.example.com/api/v1/security-integration/response");
     vi.stubEnv("MAGNUS_RESPONSE_SECRET", "test-bridge-secret-".repeat(3));
     vi.stubEnv("SECURITY_DISPATCH_ENABLED", "true");
-    vi.stubEnv("SECURITY_CONSOLE_TOKEN_SECRET", "x".repeat(64));
+    vi.stubEnv("CINDERTRACE_TEST_BEARER_SECRET", "x".repeat(64));
     const token = await new SignJWT({ userId: "user", role })
       .setProtectedHeader({ alg: "HS256" })
-      .setIssuer("cindertrace-console")
+      .setIssuer("cindertrace-test")
       .setAudience("cindertrace-api")
       .setIssuedAt()
       .setExpirationTime("60s")

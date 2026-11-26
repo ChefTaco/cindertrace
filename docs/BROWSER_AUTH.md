@@ -6,11 +6,13 @@ HiveXUI in local mode posts to `/api/cindertrace/auth/local/*` on the gateway, w
 forwards to the API's `/api/v1/auth/local/*` ([installation](INSTALLATION.md#the-ui-hivexui-in-local-mode)).
 The same sign-in is HiveXUI's recovery path in a suite when Oathweave is unavailable.
 `npm run init` enables it. It needs `CINDERTRACE_BROWSER_AUTH_ENABLED=true`, a canonical
-HTTPS `DASHBOARD_PUBLIC_ORIGIN` equal to the page origin,
-`REDIS_URL`, `SESSION_SECRET`, and dedicated `DASHBOARD_ADMIN_USERNAME` plus
-`DASHBOARD_ADMIN_PASSWORD_HASH` (Argon2id). Dedicated plaintext or base64-encoded
+HTTPS `CINDERTRACE_PUBLIC_ORIGIN` equal to the page origin,
+`REDIS_URL`, `SESSION_SECRET`, and dedicated `CINDERTRACE_ADMIN_USERNAME` plus
+`CINDERTRACE_ADMIN_PASSWORD_HASH` (Argon2id). Their legacy `DASHBOARD_*` names
+(`DASHBOARD_PUBLIC_ORIGIN`, `DASHBOARD_ADMIN_*`) keep working; see
+[setting names](INSTALLATION.md#setting-names). Dedicated plaintext or base64-encoded
 credentials remain accepted for explicit compatibility; infrastructure passwords
-are never a fallback. `DASHBOARD_ADMIN_ACCOUNT_ID` preserves the reviewed local
+are never a fallback. `CINDERTRACE_ADMIN_ACCOUNT_ID` preserves the reviewed local
 account identity. `AUTH_RATE_LIMIT_LABEL_KEY` is optional and defaults to the
 session secret; both require at least 32 characters.
 
@@ -57,6 +59,11 @@ is `loopback`. An invalid entry stops the API at startup.
 Successful sign-ins do not count toward a source's limit; failed attempts do.
 
 ## Adoption and recovery
+
+Session tokens name issuer `cindertrace` and audience `cindertrace-browser` unless
+`SESSION_ISSUER`/`SESSION_AUDIENCE` say otherwise. Earlier releases used
+`cindertrace-console` for both; the API still accepts sessions issued that way, so an
+upgrade signs nobody out.
 
 Preserve `SESSION_SECRET`, `SESSION_ISSUER`, `SESSION_AUDIENCE`,
 `LOCAL_SESSION_GENERATION`, dedicated credential values (including their encoded

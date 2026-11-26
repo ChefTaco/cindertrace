@@ -80,3 +80,31 @@ it("rejects wrong issuer, wrong audience and legacy Hive OAuth cookies on the in
   }
   expect(mget).not.toHaveBeenCalled();
 });
+it("issues Cindertrace's own session issuer and still accepts sessions from before the rename", async () => {
+  const { SESSION_ISSUER: _i, SESSION_AUDIENCE: _a, ...defaults } = env;
+  const eval_ = vi.fn().mockResolvedValue("generation");
+  const mget = vi.fn();
+  const service = new BrowserSessions({ mget, eval: eval_ } as unknown as SessionStore, {
+    ...defaults,
+    CINDERTRACE_ADMIN_ACCOUNT_ID: "local-admin-id",
+  });
+  const { decodeJwt } = await import("jose");
+  const issued = decodeJwt(await service.create("admin"));
+  expect([issued.iss, issued.aud, issued.userId]).toEqual(["cindertrace", "cindertrace-browser", "local-admin-id"]);
+  mget.mockResolvedValue(["g", "g:" + service.credentialGeneration()]);
+  for (const [issuer, audience, accepted] of [
+    ["cindertrace", "cindertrace-browser", true],
+    ["cindertrace-console", "cindertrace-console", true],
+    ["cindertrace-console", "cindertrace-browser", true],
+    ["other", "cindertrace-browser", false],
+  ] as const) {
+    const token = await new SignJWT({ username: "admin", sessionId: randomUUID() })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer(issuer)
+      .setAudience(audience)
+      .setIssuedAt()
+      .setExpirationTime("1h")
+      .sign(service.secret());
+    expect(Boolean(await service.verify(token)), issuer + " " + audience).toBe(accepted);
+  }
+});
