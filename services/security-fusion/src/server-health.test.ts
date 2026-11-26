@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { app } from "./server.js";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -76,4 +76,16 @@ it("sends no-store and nosniff on every response, after the handler, and no othe
     expect(response.headers.get("referrer-policy"), path).toBeNull();
     expect(response.headers.get("x-frame-options"), path).toBeNull();
   }
+});
+describe("backup staleness metric", () => {
+  it("reports the threshold and staleness only when configured", async () => {
+    const { backupStaleness } = await import("./routes/metrics.js");
+    const now = Date.UTC(2026, 10, 26, 12);
+    expect(backupStaleness(now - 3600_000, {}, now)).toBe("");
+    const env = { CINDERTRACE_BACKUP_MAX_AGE_HOURS: "26" };
+    expect(backupStaleness(now - 3600_000, env, now)).toBe("\nsecurity_fusion_backup_max_age_seconds 93600\nsecurity_fusion_backup_stale 0");
+    expect(backupStaleness(now - 27 * 3600_000, env, now)).toContain("security_fusion_backup_stale 1");
+    expect(backupStaleness(0, env, now)).toContain("security_fusion_backup_stale 1");
+    expect(backupStaleness(Number.NaN, env, now)).toContain("security_fusion_backup_stale 1");
+  });
 });

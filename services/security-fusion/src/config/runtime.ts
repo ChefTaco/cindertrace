@@ -34,6 +34,9 @@ export function validateRuntimeConfig(
   validateAuthLimitsConfig(env);
   parseTrustedProxies(env["CINDERTRACE_TRUSTED_PROXIES"]);
   approvalPolicy(env);
+  const backupAge = env["CINDERTRACE_BACKUP_MAX_AGE_HOURS"];
+  if (backupAge !== undefined && backupAge !== "" && (!/^\d+$/.test(backupAge) || Number(backupAge) < 1 || Number(backupAge) > 8760))
+    throw new Error("CINDERTRACE_BACKUP_MAX_AGE_HOURS must be a whole number of hours from 1 to 8760");
   if(browserAuthEnabled(env)){
     credentials(env);
     browserSessionSecret(env);

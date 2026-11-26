@@ -47,6 +47,10 @@ jobs:
       - run: npm run init
       - run: docker compose up --build --wait
       - run: docker compose exec -T -e CINDERTRACE_DEMO_CONFIRM=isolated-synthetic-installation api node scripts/demo.mjs --preserve
+      - name: Scheduled backup service writes and verifies an archive
+        run: |
+          docker compose --profile backup run --rm -T backup node scripts/backup-schedule.mjs --once
+          test "$(ls state/backups | grep -cE '^security-[0-9]{8}T[0-9]{6}Z\.aes$')" = 1
       - run: docker compose exec -T postgres createdb -U cindertrace cindertrace_test_core_ci
       - run: >-
           docker compose exec -T api node -e

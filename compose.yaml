@@ -101,6 +101,14 @@ services:
     profiles: [collector]
     depends_on:
       api: {condition: service_healthy}
+  # Scheduled encrypted backups (docs/MIGRATION.md#scheduled-backups):
+  # docker compose --profile backup up -d backup
+  backup:
+    <<: *app
+    command: [node, scripts/backup-schedule.mjs]
+    profiles: [backup]
+    depends_on:
+      api: {condition: service_healthy}
 volumes:
   postgres:
   redis:

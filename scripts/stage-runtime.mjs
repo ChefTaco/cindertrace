@@ -120,6 +120,7 @@ copy(
 );
 for (const name of [
   "backup.mjs",
+  "backup-schedule.mjs",
   "core-integration.mjs",
   "recovery-integration.mjs",
   "demo.mjs",
