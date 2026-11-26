@@ -34,3 +34,14 @@ it("retains actionable bounded policy errors", async () => {
     error: { code: "APPROVAL_EXPIRED", message: "Create a fresh approval" },
   });
 });
+it("scrubs credentials out of a deliberate error message", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  const app = new Hono();
+  app.onError(errorHandler);
+  app.get("/test", () => {
+    throw new HttpError(400, "BAD", "rejected password=fixture-value and Bearer fixture.token.value");
+  });
+  const body = await (await app.request("/test")).json();
+  expect(body.error.message).not.toMatch(/fixture-value|fixture\.token/);
+  expect(body.error.message).toContain("[REDACTED]");
+});
