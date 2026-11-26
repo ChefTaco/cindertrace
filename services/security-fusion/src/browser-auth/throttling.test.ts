@@ -16,11 +16,18 @@ function memoryStore() {
         if (concurrent >= Number(args[1])) return 0;
         return ++concurrent;
       }
+      if (!String(args[0]).endsWith(":concurrency")) {
+        const next = Math.max(0, (counts.get(String(args[0])) ?? 0) - 1);
+        counts.set(String(args[0]), next);
+        return next;
+      }
       return --concurrent;
     }),
-    del: vi.fn(async () => undefined),
+    del: vi.fn(async (...keys: string[]) => {
+      for (const key of keys) counts.delete(key);
+    }),
   };
-  return { store, sleep: vi.fn(async () => undefined) };
+  return { store, counts, sleep: vi.fn(async () => undefined) };
 }
 async function attempts(total: number) {
   const { store, sleep } = memoryStore();
@@ -72,4 +79,24 @@ it("still bounds concurrent password checks when relaxed", async () => {
   expect(permits[255]?.allowed).toBe(true);
   expect(permits[256]?.allowed).toBe(false);
   expect(permits[256]?.retryAfterSeconds).toBe(1);
+});
+
+it("does not count successful sign-ins toward the source limit", async () => {
+  const { store, sleep } = memoryStore();
+  const begin = createAuthProtection(store, sleep);
+  for (let index = 0; index < 40; index++) {
+    const permit = await begin("198.51.100.1", `user${index % 3}@example.com`);
+    expect(permit.allowed).toBe(true);
+    await permit.clearSuccessfulPair();
+    await permit.release();
+  }
+  // Failures still count: the twenty-first failed attempt from one source is refused.
+  const allowed: boolean[] = [];
+  for (let index = 0; index < 21; index++) {
+    const permit = await begin("198.51.100.1", `other${index}@example.com`);
+    allowed.push(permit.allowed);
+    await permit.release();
+  }
+  expect(allowed.slice(0, 20).every(Boolean)).toBe(true);
+  expect(allowed[20]).toBe(false);
 });

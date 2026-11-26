@@ -211,6 +211,13 @@ Configure both restart allowlists and protected target IDs. Only then enable
 `SECURITY_DISPATCH_ENABLED=true`. The agent must explicitly enable
 `MAGNUS_SECURITY_RESPONSE_ENABLED` and configure a root-owned containment helper.
 Enrolled-node admission is required; there is no direct-agent fallback.
+While `SECURITY_DISPATCH_ENABLED` is not `true`, previews and approval requests still
+work, but approvals (native and external) answer 503 `DISPATCH_DISABLED` and action
+details report `responseAvailable: false`, so no action waits in `dispatch_pending`
+for a dispatcher that is off. Previews and approval requests that are not decided
+within ten minutes are cancelled (case activity `containment.expired`, approval row
+`expired`, audit `security_fusion.action.expire`). Operator cancellation is recorded
+the same way (`containment.cancelled`, `security_fusion.action.cancel`).
 
 ## Automation credentials
 

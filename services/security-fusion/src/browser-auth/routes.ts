@@ -5,7 +5,7 @@ import { getCookie, setCookie } from "hono/cookie";
 import { z } from "zod";
 import { localBrowserLoginSchema } from "@cindertrace/contracts";
 import type { AppVariables } from "../types/index.js";
-import { getConnInfo } from "@hono/node-server/conninfo";
+import { clientAddress } from "../utils/client-address.js";
 import { exactBrowserOrigin } from "./origin.js";
 import { logAuditEvent } from "../services/audit-service.js";
 import { beginAuthentication } from "./throttling.js";
@@ -19,12 +19,11 @@ import {
 } from "./sessions.js";
 
 const Login = localBrowserLoginSchema;
-function peerAddress(c: Context<AppVariables>): string {
-  try {
-    return getConnInfo(c).remote.address ?? "unverified";
-  } catch {
-    return "unverified";
-  }
+async function peerAddress(
+  c: Context<AppVariables>,
+  env: NodeJS.ProcessEnv,
+): Promise<string> {
+  return (await clientAddress(c, env)) || "unverified";
 }
 type Admission = Awaited<ReturnType<typeof beginAuthentication>>;
 type Dependencies = {
@@ -91,8 +90,8 @@ export function browserAuthRouter(
       } catch {
         return c.json({ error: "Invalid authentication request" }, 400);
       }
-      // Node peer wins over all caller-supplied forwarding headers.
-      const source = peerAddress(c);
+      // The socket peer, or the forwarded client behind a trusted proxy (the gateway).
+      const source = await peerAddress(c, env);
       permit = await admission(source, body.username);
       const labels = {
         source: permit.sourceLabel,
@@ -150,7 +149,7 @@ export function browserAuthRouter(
         "auth.login_error",
         "anonymous",
         { reason: "authentication_unavailable" },
-        peerAddress(c),
+        await peerAddress(c, env).catch(() => "unverified"),
       ).catch(() => undefined);
       return c.json({ error: "Authentication temporarily unavailable" }, 503);
     } finally {
@@ -184,7 +183,7 @@ export function browserAuthRouter(
           "auth.logout",
           session.userId ?? env.DASHBOARD_ADMIN_ACCOUNT_ID ?? session.username,
           { all: c.req.query("all") === "true" },
-          peerAddress(c),
+          await peerAddress(c, env),
           session.username,
         );
       }

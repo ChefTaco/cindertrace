@@ -39,6 +39,9 @@ services:
   api:
     <<: *app
     command: [node, services/security-fusion/dist/index.js]
+    environment:
+      # Browsers arrive through the gateway; its X-Forwarded-For names the client.
+      CINDERTRACE_TRUSTED_PROXIES: '${CINDERTRACE_TRUSTED_PROXIES:-gateway}'
     depends_on:
       migrate: {condition: service_completed_successfully}
       redis: {condition: service_healthy}
@@ -49,7 +52,8 @@ services:
   # HiveXUI in local mode: Cindertrace pages only, signed in by the API's own local sign-in.
   # Static files only; it is reached through the gateway and has no published port.
   ui:
-    image: '${CINDERTRACE_UI_IMAGE:-ghcr.io/cheftaco/hivexui@sha256:4f73777b1d598a08e318fb174a0f30458ec6c175a67ca277180df35eb994994f}'
+    # HiveXUI 0.12.0 (the digest Hive 3.14.3's signed suite manifest pins).
+    image: '${CINDERTRACE_UI_IMAGE:-ghcr.io/cheftaco/hivexui@sha256:8407f94d12d9de5d844718f25f15b7728709380d932cc655466773becb338a99}'
     user: '101:101'
     restart: unless-stopped
     read_only: true

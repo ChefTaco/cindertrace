@@ -271,6 +271,8 @@ export class ComposeInstallation {
         .digest("hex");
     return {
       ...JSON.parse(readFileSync(join(source, "release.json"))),
+      // The product version lives in package.json only, as in the staged runtime.
+      version: JSON.parse(readFileSync(join(source, "package.json"))).version,
       revision: record.revision,
       migrations,
     };
@@ -477,10 +479,21 @@ export class ComposeInstallation {
       { file },
     );
   }
+  /**
+   * Settings a release needs that an installation's existing compose.yaml cannot supply
+   * (the command keeps that file). An operator's own value is never replaced.
+   */
+  releaseDefaults() {
+    // 0.8.3: the API reads the gateway's X-Forwarded-For only from a trusted proxy.
+    return "CINDERTRACE_TRUSTED_PROXIES" in this.env
+      ? {}
+      : { CINDERTRACE_TRUSTED_PROXIES: "gateway" };
+  }
   async activate(record) {
     atomicPrivate(
       this.envFile,
       patchEnvironment(this.originalEnv, {
+        ...this.releaseDefaults(),
         ...pausedEnvironment({}),
         CINDERTRACE_IMAGE: record.image,
       }),
@@ -520,7 +533,10 @@ export class ComposeInstallation {
   async resume(record) {
     atomicPrivate(
       this.envFile,
-      patchEnvironment(this.originalEnv, { CINDERTRACE_IMAGE: record.image }),
+      patchEnvironment(this.originalEnv, {
+        ...this.releaseDefaults(),
+        CINDERTRACE_IMAGE: record.image,
+      }),
     );
     await this.compose([
       "up",

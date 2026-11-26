@@ -50,6 +50,10 @@ test("configuration inspection includes disabled profiles and resolves local sta
     );
     assert.throws(() => install.hostPath("api", "/state/../etc"));
     assert.throws(() => install.hostPath("api", "/unknown"));
+    // The gateway becomes a trusted proxy unless the operator chose otherwise.
+    assert.deepEqual(install.releaseDefaults(), { CINDERTRACE_TRUSTED_PROXIES: "gateway" });
+    install.env.CINDERTRACE_TRUSTED_PROXIES = "none";
+    assert.deepEqual(install.releaseDefaults(), {});
   } finally {
     rmSync(root, { recursive: true });
   }

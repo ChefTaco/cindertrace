@@ -41,5 +41,9 @@ it('creates one exact response plan without exposing a console approval token or
   expect(fixture.approval.planSha256).toMatch(/^[a-f0-9]{64}$/);
   expect(fixture.approval.requestedBy).toBe('service:security-plugin:aegis-workflow');
   expect(fixture.status).toBe('pending_approval');
+  // With dispatch off an approval could never be sent, so it is refused outright.
+  const disabled=await app.request('/api/v1/security-fusion/actions/a1/approve',{method:'POST',headers:{Authorization:'Bearer '+admin}});
+  expect(disabled.status).toBe(503);expect((await disabled.json()).error).toContain('dispatch is disabled');
+  vi.stubEnv('SECURITY_DISPATCH_ENABLED','true');
   expect((await app.request('/api/v1/security-fusion/actions/a1/approve',{method:'POST',headers:{Authorization:'Bearer '+admin}})).status).toBe(400);
 });

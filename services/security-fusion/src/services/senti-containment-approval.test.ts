@@ -95,6 +95,9 @@ beforeEach(() => {
     keys.publicKey.export({ format: "der", type: "spki" }).toString("base64"),
   );
   vi.stubEnv("SENTI_TELEGRAM_ACTOR_SHA256", actor);
+  vi.stubEnv("MAGNUS_RESPONSE_URL", "https://magnus.example.com/response");
+  vi.stubEnv("MAGNUS_RESPONSE_SECRET", "test-bridge-secret-".repeat(3));
+  vi.stubEnv("SECURITY_DISPATCH_ENABLED", "true");
   state.action = {
     id: "action-1",
     caseId: "case-1",
@@ -162,6 +165,19 @@ describe("Senti containment decision", () => {
       state.approvalUpdates,
       state.outboxes,
     ]).toEqual([0, 0, 0]);
+  });
+  it("refuses an approval while dispatch is disabled, leaving the plan pending", async () => {
+    vi.stubEnv("SECURITY_DISPATCH_ENABLED", "false");
+    const plan = validateStoredContainmentPlan(state.action, state.approval);
+    await expect(recordContainmentApproval(assertion(plan))).rejects.toMatchObject({
+      status: 503,
+      code: "DISPATCH_DISABLED",
+    });
+    expect([state.actionUpdates, state.approvalUpdates, state.outboxes]).toEqual([0, 0, 0]);
+    // A rejection still records.
+    await expect(
+      recordContainmentApproval(assertion(plan, "reject")),
+    ).resolves.toMatchObject({ decision: "reject" });
   });
   it("records rejection without creating a dispatch outbox", async () => {
     const result = await recordContainmentApproval(

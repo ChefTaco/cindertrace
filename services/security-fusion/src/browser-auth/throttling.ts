@@ -176,6 +176,9 @@ export function createAuthProtection(
         },
         async clearSuccessfulPair() {
           await store.del(usernameKey, pairKey);
+          // A successful sign-in does not count toward its source's limit either, so
+          // failed attempts from one address cannot crowd out everyone's sign-ins.
+          await store.eval(RELEASE_SCRIPT, 1, sourceKey);
         },
       };
     }

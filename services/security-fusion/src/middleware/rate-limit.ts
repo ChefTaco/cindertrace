@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import { Redis } from "ioredis";
 import { incMetric } from "../routes/metrics.js";
-import { heartbeatPeerAddress } from "../utils/heartbeat-peer.js";
+import { clientAddress } from "../utils/client-address.js";
 
 const REDIS_URL = process.env["REDIS_URL"] ?? "redis://127.0.0.1:6379";
 const REDIS_PREFIX = process.env["REDIS_PREFIX"] ?? "cindertrace-";
@@ -25,7 +25,9 @@ function getRedis(): Redis {
 
 /**
  * Sliding-window rate limiter backed by Redis.
- * Keyed by client IP address. Falls through (allows) if Redis is unavailable.
+ * Keyed by client address: the socket peer, or the X-Forwarded-For client when the
+ * peer is a trusted proxy (see utils/client-address.ts). Falls through (allows) if
+ * Redis is unavailable, unless failClosed is set.
  *
  * @param opts.windowMs  Time window in milliseconds (default: 60_000 = 1 minute)
  * @param opts.max       Maximum requests per window (default: 100)
@@ -44,11 +46,9 @@ export function rateLimitMiddleware(
   const prefix = opts.keyPrefix ?? "rl";
 
   return async (c, next) => {
-    // Port 4000 is directly reachable by fleet peers. A caller-controlled
-    // forwarding header must not let login or mutation clients rotate their
-    // rate-limit identity. The helper prefers the Node socket peer and only
-    // falls back to forwarded metadata in adapter-free/test contexts.
-    const ip = heartbeatPeerAddress(c) || "unknown-peer";
+    // Browsers arrive through the gateway or Hive's ingress; a caller-written
+    // forwarding header is read only past a configured trusted proxy.
+    const ip = (await clientAddress(c)) || "unknown-peer";
 
     const key = `${REDIS_PREFIX}${prefix}:${ip}`;
     const now = Date.now();
