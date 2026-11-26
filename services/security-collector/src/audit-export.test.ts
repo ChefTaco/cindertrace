@@ -164,6 +164,30 @@ describe("HiveAuditRecord mapping", () => {
     expect(auditSeverity(action, outcome)).toBe(severity);
   });
 
+  it("takes an Embermend finding's severity from the finding and its node as the host", () => {
+    const finding = (severity: unknown, action = "finding.observed") =>
+      auditRecordEvent(record(9, {
+        id: "embermend:audit:9",
+        product: "embermend",
+        action,
+        actor: { type: "service", id: "service:scanner" },
+        subject: { nodeId: "node-a" },
+        details: { severity: severity as string, kind: "vulnerability", priority: 2 },
+      }));
+    const critical = finding("critical");
+    expect(critical.severity).toBe("critical");
+    expect(securityFusionEventSchema.parse(critical).entities).toContainEqual({ type: "host", value: "node-a" });
+    expect(critical.attributes["nodeId"]).toBe("node-a");
+    expect(finding("low", "finding.recurred").severity).toBe("low");
+    // Unknown or missing severity falls back to the action terms (finding.observed: low).
+    expect(finding("unknown").severity).toBe("low");
+    expect(finding(undefined).severity).toBe("low");
+    // Another product's details.severity is not trusted for this.
+    const other = auditRecordEvent(record(10, { details: { severity: "critical" }, subject: { nodeId: "node-a" } }));
+    expect(other.severity).not.toBe("critical");
+    expect(other.entities).not.toContainEqual({ type: "host", value: "node-a" });
+  });
+
   it("maps a record to a valid event with agent entities from the subject", () => {
     const event = auditRecordEvent(
       record(7, {

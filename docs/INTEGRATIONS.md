@@ -124,6 +124,13 @@ Severity comes from the action's dotted and underscored terms, then the outcome:
 A `failure` outcome raises the severity one step, to at least `medium`; a failed
 credential or permission change is `critical`.
 
+Embermend findings (`finding.observed`, `finding.recurred`) take their severity from the
+finding instead (`details.severity`: `critical`, `high`, `medium` or `low`; `unknown` falls
+back to the table). For Embermend records, `subject.nodeId` (the Magnus node a finding was
+observed on or an execution ran on) also attaches a `host` entity with that node ID, so the
+event correlates with the host's other events. Embermend reports an execution whose effect
+is failed or unknown as outcome `failure`, which raises its severity as above.
+
 ### Poll status
 
 Each source's status report also carries what its latest poll read. `GET /sources`
