@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { getDb } from "../db/index.js";
 import { HttpError } from "../middleware/error-handler.js";
+import { dispatchAvailable } from "../config/runtime.js";
 import {
   approvalDigest,
   requireFreshApproval,
@@ -227,6 +228,12 @@ export async function recordContainmentApproval(raw: unknown) {
       };
     }
     requireFreshApproval(p);
+    if (p.decision === "approve" && !dispatchAvailable())
+      throw new HttpError(
+        503,
+        "DISPATCH_DISABLED",
+        "Response dispatch is disabled on this installation",
+      );
     const [action, approval] = await Promise.all([
       db.securityFusionAction.findUnique({ where: { id } }),
       db.securityFusionActionApproval.findUnique({ where: { actionId: id } }),

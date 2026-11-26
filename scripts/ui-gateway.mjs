@@ -2,6 +2,8 @@
 // TLS at DASHBOARD_PUBLIC_ORIGIN, HiveXUI's static files from the internal `ui` service, and
 // /api/cindertrace/* to the API's /api/v1/*. It holds no product secret and adds no identity:
 // the API authenticates every request itself from its own `cindertrace_session` cookie.
+// It appends the address it received each API request from to X-Forwarded-For; the API
+// reads that header only from a trusted proxy (CINDERTRACE_TRUSTED_PROXIES), from the right.
 import { createServer as createHttpsServer } from 'node:https';
 import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { Agent as HttpsAgent, request as httpsRequest } from 'node:https';
@@ -12,7 +14,7 @@ import { resolve } from 'node:path';
 export const API_PREFIX = '/api/cindertrace/';
 export const SESSION_COOKIE = 'cindertrace_session';
 // Request headers a browser needs to reach each upstream. Everything else, including
-// Authorization, forwarding headers and other cookies, stays at the gateway.
+// Authorization, other forwarding headers and other cookies, stays at the gateway.
 const STATIC_HEADERS = ['accept', 'accept-encoding', 'accept-language', 'if-modified-since', 'if-none-match', 'range', 'user-agent'];
 const API_HEADERS = [...STATIC_HEADERS, 'content-length', 'content-type', 'origin', 'x-request-id'];
 // Hop-by-hop response headers are the gateway's own connection's business.
@@ -37,6 +39,23 @@ export function sessionCookie(header) {
   if (!header) return undefined;
   const kept = String(header).split(/;\s*/).filter(part => part.startsWith(SESSION_COOKIE + '='));
   return kept.length ? kept.join('; ') : undefined;
+}
+
+const MAX_FORWARDED_HOPS = 16;
+const normalize = address => (address?.startsWith('::ffff:') ? address.slice(7) : address ?? '');
+
+/**
+ * X-Forwarded-For for the API: the incoming value with this connection's peer appended
+ * (at most the last 16 entries). The API reads it from the right and stops at the first
+ * address that is not a trusted proxy, so a caller-written prefix is never the client
+ * unless every hop after it is trusted.
+ */
+export function forwardedFor(incoming, peer) {
+  const hops = (Array.isArray(incoming) ? incoming.join(',') : incoming ?? '')
+    .split(',').map(hop => hop.trim()).filter(Boolean);
+  const address = normalize(peer);
+  if (address) hops.push(address);
+  return hops.slice(-MAX_FORWARDED_HOPS).join(', ') || undefined;
 }
 
 function reply(res, status, body = '') {
@@ -76,6 +95,9 @@ export function createGateway({ api, ui, timeoutMs = 120_000 }) {
       const headers = pick(req.headers, API_HEADERS);
       const cookie = sessionCookie(req.headers.cookie);
       if (cookie) headers.cookie = cookie;
+      const forwarded = forwardedFor(req.headers['x-forwarded-for'], req.socket.remoteAddress);
+      if (forwarded) headers['x-forwarded-for'] = forwarded;
+      headers['x-forwarded-proto'] = req.socket.encrypted ? 'https' : 'http';
       if (req.headers['transfer-encoding'] && headers['content-length'] === undefined) headers['transfer-encoding'] = 'chunked';
       return forward(req, res, apiUpstream, '/api/v1/' + url.pathname.slice(API_PREFIX.length) + url.search, headers);
     }

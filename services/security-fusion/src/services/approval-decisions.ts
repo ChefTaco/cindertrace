@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../db/index.js";
 import { HttpError } from "../middleware/error-handler.js";
 import { validateStoredContainmentPlan } from "./senti-containment-approval.js";
-import { responseConfigured } from "../config/runtime.js";
+import { dispatchAvailable, responseConfigured } from "../config/runtime.js";
 export { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
 import { securityAdminDecisionSchema as adminDecisionSchema } from "@cindertrace/contracts/browser";
 export async function decideAsAdmin(
@@ -22,6 +22,13 @@ export async function decideAsAdmin(
       503,
       "RESPONSE_UNCONFIGURED",
       "Magnus response is not configured",
+    );
+  // An approval the dispatcher will never send would sit in dispatch_pending forever.
+  if (decision === "approve" && !dispatchAvailable())
+    throw new HttpError(
+      503,
+      "DISPATCH_DISABLED",
+      "Response dispatch is disabled on this installation",
     );
   const parsed = adminDecisionSchema.safeParse(raw);
   if (!parsed.success)

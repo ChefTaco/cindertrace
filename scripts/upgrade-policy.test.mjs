@@ -106,4 +106,6 @@ test('lab schema release requires reviewed schema reconciliation before automati
   const release = JSON.parse(readFileSync(new URL('../release.json', import.meta.url), 'utf8'));
   assert.equal(release.schemaProfile, 'cindertrace-v2');
   assert.equal(release.rollbackCompatible, false);
+  // The version comes from package.json wherever release metadata is recorded.
+  assert.equal(release.version, undefined);
 });

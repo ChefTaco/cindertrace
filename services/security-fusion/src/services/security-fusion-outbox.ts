@@ -1,4 +1,5 @@
-import {isRehearsal} from "../config/rehearsal.js";
+import {isRehearsal,securityWritesEnabled} from "../config/rehearsal.js";
+import { expireStaleSecurityFusionActions } from "./security-fusion-action-expiry.js";
 import { randomUUID } from "node:crypto";
 import { magnusRequest, type ResponseRequest } from "@cindertrace/integrations";
 import { responseConfigured } from "../config/runtime.js";
@@ -370,6 +371,7 @@ export async function reconcileRestartVerification(): Promise<void> {
   }
 }
 let timer: ReturnType<typeof setInterval> | undefined;
+let expiryTimer: ReturnType<typeof setInterval> | undefined;
 export function startSecurityFusionOutboxDispatcher(): void {
   if(isRehearsal()||timer)return;
   timer = setInterval(() => {
@@ -378,8 +380,18 @@ export function startSecurityFusionOutboxDispatcher(): void {
     );
   }, 2000);
   timer.unref();
+  // Expiry runs even with dispatch disabled: abandoned previews and requests still lapse.
+  expiryTimer = setInterval(() => {
+    if (!securityWritesEnabled()) return;
+    void expireStaleSecurityFusionActions().catch(() =>
+      console.error("[cindertrace] action expiry sweep failed"),
+    );
+  }, 60_000);
+  expiryTimer.unref();
 }
 export function stopSecurityFusionOutboxDispatcher(): void {
   if (timer) clearInterval(timer);
+  if (expiryTimer) clearInterval(expiryTimer);
   timer=undefined;
+  expiryTimer=undefined;
 }

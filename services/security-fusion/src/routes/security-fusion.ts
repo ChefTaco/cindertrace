@@ -1,6 +1,7 @@
 import { registerLabRoutes } from "./investigation-lab.js";
 import { decideAsAdmin } from "../services/approval-decisions.js";
-import { responseConfigured } from "../config/runtime.js";
+import { dispatchAvailable, responseConfigured } from "../config/runtime.js";
+import { ACTION_APPROVAL_TTL_MS, cancelSecurityFusionAction } from "../services/security-fusion-action-expiry.js";
 import { validateActionTarget } from "../services/targets.js";
 import { createHmac, randomBytes } from "node:crypto";
 import { Hono, type Context } from "hono";
@@ -62,7 +63,7 @@ import { incMetric } from "./metrics.js";
 export const securityFusionRouter = new Hono<AppVariables>();
 
 const INGEST_SKEW_MS = 5 * 60_000;
-const APPROVAL_TTL_MS = 10 * 60_000;
+const APPROVAL_TTL_MS = ACTION_APPROVAL_TTL_MS;
 const SOURCE_STALE_MS = Math.max(
   Number(process.env["SECURITY_FUSION_SOURCE_STALE_MS"]) || 5 * 60_000,
   60_000,
@@ -881,7 +882,7 @@ securityFusionRouter.get("/cases/:id", async (c) => {
     c.req.param("id"),
     hasPermission(getUser(c), "security-fusion:evidence:read"),
   );
-  return c.json({ success: true, data: { ...detail, responseAvailable: responseConfigured(), canApprove: getUser(c).role === "ADMIN", approvalMode: process.env["SECURITY_APPROVAL_MODE"] === "external" ? "external" : "console" } });
+  return c.json({ success: true, data: { ...detail, responseAvailable: dispatchAvailable(), canApprove: getUser(c).role === "ADMIN", approvalMode: process.env["SECURITY_APPROVAL_MODE"] === "external" ? "external" : "console" } });
 });
 
 securityFusionRouter.patch(
@@ -1252,24 +1253,14 @@ securityFusionRouter.post(
   "/actions/:id/cancel",
   requireRole("ADMIN", "OPERATOR"),
   async (c) => {
-    const actionId = c.req.param("id");
-    const row = await getDb().securityFusionAction.updateMany({
-      where: {
-        id: actionId,
-        status: { in: securityFusionActionSources("cancelled") },
-      },
-      data: { status: "cancelled", approvalTokenHash: null },
-    });
-    if (row.count === 0)
+    const actionId = c.req.param("id")!;
+    const row = await cancelSecurityFusionAction(actionId, getUser(c).userId);
+    if (!row)
       throw new HttpError(
         409,
         "INVALID_ACTION_STATE",
         "Only unexecuted actions may be cancelled",
       );
-    await getDb().securityFusionActionApproval.updateMany({
-      where: { actionId, status: "pending" },
-      data: { status: "cancelled", decidedAt: new Date() },
-    });
     return c.json({
       success: true,
       data: { id: actionId, status: "cancelled" },

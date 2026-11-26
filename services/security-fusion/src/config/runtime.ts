@@ -4,6 +4,7 @@ import {credentials} from "../browser-auth/credentials.js";
 import {exactBrowserOrigin} from "../browser-auth/origin.js";
 import { validateLabIsolation } from "./lab-isolation.js";
 import { validateAuthLimitsConfig } from "./auth-limits.js";
+import { parseTrustedProxies } from "../utils/client-address.js";
 /** Validate enabled capabilities without requiring any optional product. */
 import { configuredCollectorCredentials } from "../services/security-fusion-ingest.js";
 export function responseConfigured(
@@ -11,12 +12,19 @@ export function responseConfigured(
 ): boolean {
   return !isRehearsal(env) && env["CINDERTRACE_LAB_ENABLED"] !== "true" && Boolean(env["MAGNUS_RESPONSE_URL"] && env["MAGNUS_RESPONSE_SECRET"]);
 }
+/** Approved actions can be sent: the bridge is configured and the dispatcher is on. */
+export function dispatchAvailable(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return responseConfigured(env) && env["SECURITY_DISPATCH_ENABLED"] === "true";
+}
 export function validateRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
   applyRehearsalGuards(env);
   validateLabIsolation(env);
   validateAuthLimitsConfig(env);
+  parseTrustedProxies(env["CINDERTRACE_TRUSTED_PROXIES"]);
   if(browserAuthEnabled(env)){
     credentials(env);
     browserSessionSecret(env);

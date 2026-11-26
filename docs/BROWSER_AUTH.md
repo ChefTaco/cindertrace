@@ -33,8 +33,28 @@ security API independently validates this cookie, its current durable state and
 its permissions; non-read cookie requests also require the configured exact
 Origin. Bearer and signed native clients retain their existing protocols. Redis
 or audit failure denies sign-in; failed durable revocation does not clear the
-cookie or pretend sign-out succeeded. Caller-supplied forwarding headers never
-replace the API's bound socket address for authentication admission.
+cookie or pretend sign-out succeeded.
+
+## Client addresses behind the gateway or ingress
+
+Sign-in throttling, the API rate limits and authentication audit records are keyed on
+the client address. Browsers reach the API through a proxy, so the API takes it from
+`X-Forwarded-For` only when the socket peer is listed in `CINDERTRACE_TRUSTED_PROXIES`,
+reading from the right and stopping at the first address that is not a trusted proxy.
+A forwarding header a caller writes itself is therefore never used. The list holds IP
+addresses, CIDR ranges, host names (resolved through DNS and looked up again when the
+proxy's address changes) and the keyword `loopback`; `none` trusts no proxy. Unset, it
+is `loopback`. An invalid entry stops the API at startup.
+
+- Compose installations set it to `gateway`. The gateway appends the address it
+  received each request from and sets `X-Forwarded-Proto`. If another reverse proxy
+  sits in front of the gateway, add that proxy's address as the gateway sees it (for a
+  proxy on the Docker host, usually the Compose network's gateway address), for
+  example `CINDERTRACE_TRUSTED_PROXIES="gateway 172.18.0.1"` in `.env`.
+- In a Hive suite, list the address of Hive's ingress, which sends exactly one
+  client address.
+
+Successful sign-ins do not count toward a source's limit; failed attempts do.
 
 ## Adoption and recovery
 

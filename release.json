@@ -4,6 +4,5 @@
   "layoutVersion": 2,
   "rollbackCompatible": false,
   "notes": "Layout 2 (0.8.0): HiveXUI through the gateway replaces the standalone console; 0.7.x Compose installations move by the manual steps in docs/UPGRADING.md. Schema profile cindertrace-v2 adds lab run, checkpoint and simulation tables; rollback requires a reviewed compatible schema and verified restore, and no down migration is applied.",
-  "schemaProfile": "cindertrace-v2",
-  "version": "0.2.2"
+  "schemaProfile": "cindertrace-v2"
 }

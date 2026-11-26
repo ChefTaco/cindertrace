@@ -108,6 +108,12 @@ async function run() {
       return {id: action.id, decision: {confirmed: true, planSha256: plan.plan_sha256, previewSha256: action.previewSha256}};
     }
     async function approved() {const item = await proposed(); assert.equal((await request(item.id, 'approve', item.decision)).status, 200); return item;}
+    const disabled = await proposed();
+    const refused = await request(disabled.id, 'approve', disabled.decision);
+    assert.equal(refused.status, 503); assert.equal((await refused.json()).error.code, 'DISPATCH_DISABLED');
+    assert.equal(await db.securityFusionCommandOutbox.count({where: {actionId: disabled.id}}), 0);
+    // Approvals need dispatch on; no dispatcher runs here until the test calls it.
+    process.env.SECURITY_DISPATCH_ENABLED = 'true';
     const expired = await proposed();
     await db.securityFusionActionApproval.update({where: {actionId: expired.id}, data: {expiresAt: new Date(Date.now() - 1)}});
     assert.equal((await request(expired.id, 'approve', expired.decision)).status, 409);

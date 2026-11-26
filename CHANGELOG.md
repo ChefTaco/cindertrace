@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- Sign-in throttling and the API rate limits are keyed on the browser's address again instead of the gateway's. Every browser request reaches the API from the gateway (or Hive's ingress), so the per-source sign-in limit and the 120-per-minute API limit were one bucket shared by everyone: repeated failed sign-ins from anywhere could block all sign-ins. The gateway now appends the address it received each API request from to `X-Forwarded-For` and sets `X-Forwarded-Proto`; the API reads `X-Forwarded-For` only when the connection comes from a proxy listed in the new `CINDERTRACE_TRUSTED_PROXIES` (addresses, CIDR ranges, host names, `loopback`, `none`; default `loopback`), from the right, so a forwarding header written by the caller is never used. Compose sets it to `gateway`, and the managed upgrade adds `CINDERTRACE_TRUSTED_PROXIES=gateway` to `.env` when it is not set. In a Hive suite, set it to the ingress address. An invalid entry stops the API at startup. See [client addresses](docs/BROWSER_AUTH.md#client-addresses-behind-the-gateway-or-ingress).
+- Successful sign-ins no longer count toward a source's sign-in limit; failed attempts still do.
+
+### Fixed
+
+- Approvals are refused with 503 `DISPATCH_DISABLED` while `SECURITY_DISPATCH_ENABLED` is not `true`, and action details report `responseAvailable: false`. Before, an approval succeeded and the action stayed in `dispatch_pending` for good, which also blocked `npm run upgrade`.
+- Previews and approval requests not decided within ten minutes are cancelled by a sweep that runs every minute while security writes are enabled. The case gets a `containment.expired` activity, the approval row becomes `expired`, and the audit log records `security_fusion.action.expire`. They used to stay open and block `npm run upgrade`.
+- Cancelling an action updates the action and its approval in one transaction and writes a `containment.cancelled` case activity and a `security_fusion.action.cancel` audit entry.
+- The managed upgrade records the candidate's version from `package.json`. `release.json` no longer carries its own (stale) `version`.
+
+### Changed
+
+- Fresh Compose installations run HiveXUI 0.12.0 (the digest Hive 3.14.3 pins), up from 0.10.0. The managed upgrade still keeps the installation's `ui` image; set `CINDERTRACE_UI_IMAGE` to move an existing installation.
+
 ## [0.8.2] - 2026-11-24
 
 ### Security
