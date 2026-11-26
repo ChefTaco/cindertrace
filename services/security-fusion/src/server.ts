@@ -1,3 +1,4 @@
+import { auditExportRouter } from "./routes/audit-export.js";
 import {isRehearsal,securityWritesEnabled} from "./config/rehearsal.js";
 import { readFile } from "node:fs/promises";
 import { rateLimitMiddleware } from "./middleware/rate-limit.js";
@@ -31,6 +32,7 @@ app.use(
   }),
 );
 app.route('/api/v1/auth/local', browserAuthRouter());
+app.route('/api/v1/audit', auditExportRouter);
 app.route('/api/v1/auth/oathweave', oathweaveBrowserRouter());
 app.get("/health", (c) =>
   c.json({

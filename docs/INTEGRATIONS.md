@@ -124,6 +124,28 @@ Severity comes from the action's dotted and underscored terms, then the outcome:
 A `failure` outcome raises the severity one step, to at least `medium`; a failed
 credential or permission change is `critical`.
 
+### Poll status
+
+Each source's status report also carries what its latest poll read. `GET /sources`
+returns, per source, `checkpoint` (the last stored cursor), `lastPollAt`,
+`lastPollRecords` (records queued) and `lastPollPages` (pages fetched, including the
+final empty one), next to `status`, `lastSuccessAt`, `lastErrorAt` and `lastError`. A
+poll that fails part way reports how far it got, so `status: "error"` with
+`lastPollPages: 1` and `lastPollRecords: 0` means the first page was refused.
+
+### Cindertrace's own audit
+
+Cindertrace serves its own audit in the same format at `GET /api/v1/audit/export?after=&limit=`
+(1 to 200, default 100), oldest first: approvals, evidence preservation, collector
+revocation, sign-ins and the rest of the hash-chained audit files. Records have product
+`cindertrace` and IDs `cindertrace:audit:<entry id>`; `details` keeps the entry's scalar
+values plus `chain` (`verified`, `legacy-partial` or `invalid`), and client addresses are
+not exported; details are flattened and redacted with hive-common's `auditDetails()`, and each
+record is checked with `validateHiveAuditRecord()` (an entry that fails is skipped). `nextCursor`
+names the last entry read, also on the final page; it is `null` only when nothing was read. It can be read by an ADMIN, or by a consumer holding the
+endpoint-scoped credential whose SHA-256 is `SECURITY_AUDIT_EXPORT_TOKEN_SHA256` (that
+credential reads nothing else).
+
 ## Hive
 
 Hive login uses the configured discovery URL, client ID, issuer, API audience,

@@ -1,4 +1,5 @@
 import { hiveEventsFeedRoute, securityBrowserRoutes } from "@cindertrace/contracts/browser";
+import { cindertraceAuditExportPageSchema } from "@cindertrace/contracts";
 import { z } from "zod";
 import {
   localBrowserLoginSchema,localBrowserProfileSchema,
@@ -126,6 +127,9 @@ export function buildOpenApiSpec() {
   paths["/api/v1/auth/oathweave/session"]={post:{summary:"Exchange an independently verified, explicitly linked Oathweave resource identity for a short-lived API-owned browser cookie; validates online revocation on every use",security:[{bearerAuth:[]}],responses:{200:{description:"Secure HttpOnly SameSite=Lax cookie; encrypted credential remains server-owned"},...localAuthResponses}}};
   paths["/api/v1/auth/local/session"]={get:{summary:"Verify API-owned local or Oathweave browser session and current revocation state",security:[{browserCookie:[]}],responses:{200:{description:"Current local identity",content:{"application/json":{schema:z.toJSONSchema(localBrowserProfileSchema)}}},...localAuthResponses}}};
   paths["/api/v1/auth/local/logout"]={post:{summary:"Durably revoke current session or its local account/linked identity sessions before clearing cookie",security:[{browserCookie:[]}],parameters:[{name:"all",in:"query",schema:{type:"boolean"}}],responses:{200:{description:"Revoked and cookie cleared"},...localAuthResponses}}};
+  paths["/api/v1/audit/export"]={get:{summary:"Cindertrace's own audit as HiveAuditRecord v1 (product cindertrace), oldest first; ADMIN or the endpoint-scoped audit export credential",tags:["Hive"],security:[{bearerAuth:[]},{browserCookie:[]}],
+    parameters:[{name:"after",in:"query",required:false,description:"Opaque cursor from a previous page's nextCursor; the page holds the records after it.",schema:{type:"string"}},{name:"limit",in:"query",required:false,description:"Page size, 1 to 200; default 100.",schema:{type:"integer",minimum:1,maximum:200,default:100}}],
+    responses:{200:{description:"Audit page; nextCursor names the last record and is null when there are none",content:{"application/json":{schema:z.toJSONSchema(cindertraceAuditExportPageSchema)}}},400:{description:"Malformed cursor or limit"},401:{description:"Missing or invalid credentials"},403:{description:"Not ADMIN or the audit export credential"}}}};
   return {
     openapi: "3.1.0",
     info: {

@@ -191,6 +191,10 @@ model SecurityFusionSourceState {
   lastError      String?
   rejectedCount  Int       @default(0)
   truncatedCount Int       @default(0)
+  /// The last poll that reported its size: when, records read and pages fetched.
+  lastPollAt      DateTime?
+  lastPollRecords Int?
+  lastPollPages   Int?
   updatedAt      DateTime  @updatedAt
 
   @@map("security_fusion_source_state")

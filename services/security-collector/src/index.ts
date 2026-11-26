@@ -222,6 +222,8 @@ async function flush(): Promise<void> {
   }
 }
 
+/** What the latest poll of each suite audit source read, reported with its status. */
+const pollStats = new Map<SecurityFusionSource, { records: number; pages: number }>();
 async function reportSourceStatus(): Promise<void> {
   if (sourceHealth.size === 0) return;
   const admitted = [...sourceHealth.entries()].filter(
@@ -240,6 +242,7 @@ async function reportSourceStatus(): Promise<void> {
         ? { checkpoint: committedCursors.get(source)! }
         : {}),
       ...(state.error ? { error: state.error } : {}),
+      ...(pollStats.get(source) ? { poll: pollStats.get(source)! } : {}),
     })),
   };
   const raw = JSON.stringify(report);
@@ -734,7 +737,9 @@ async function pollSources(): Promise<void> {
     );
   }
   // Each product polls independently; one failing source never holds the others.
-  for (const config of auditSources ?? [])
+  for (const config of auditSources ?? []) {
+    const stats = { records: 0, pages: 0 };
+    pollStats.set(config.source, stats);
     work.push(
       runPoll(`${config.source} audit export poll failed`, [config.source], () =>
         pollAuditSource({
@@ -744,9 +749,11 @@ async function pollSources(): Promise<void> {
           setCursor: (cursor) => cursors.set(config.source, cursor),
           request,
           enqueue,
+          stats,
         }),
       ),
     );
+  }
   await Promise.all(work);
   await reportSourceStatus().catch((error: unknown) => {
     console.error(
