@@ -8,7 +8,15 @@
 
 ### Added
 
-- Cursor pagination for `/cases`, `/events`, `/entities`, `/evidence` and `/deletion-receipts`: responses carry `nextCursor`, `?cursor=` continues after the last row served, and `?limit=` (1 to 250) sets the page size. The first page is unchanged, so older cases are now reachable instead of only the newest 100 or 250. See [browser contracts](docs/BROWSER_CONTRACTS.md).
+- Cursor pagination for `/cases`, `/events`, `/entities`, `/evidence` and `/deletion-receipts`: responses carry `nextCursor`, `?cursor=` continues after the last row served, and `?limit=` (1 to 250) sets the page size. The first page is unchanged, so older cases are now reachable instead of only the newest 100 or 250. See [browser contracts](docs/BROWSER_CONTRACTS.md). Cases and entities are ordered by last activity, so one that gains activity while a client pages moves to the first page; the browser contracts describe it.
+- Optional approval safeguards. `SECURITY_APPROVAL_MAX_AUTH_AGE_SECONDS` requires an approver to have signed in recently (401 `REAUTHENTICATION_REQUIRED` otherwise); `SECURITY_APPROVAL_DISTINCT_APPROVER=true` stops the administrator who previewed or requested an action from approving it (403 `DISTINCT_APPROVER_REQUIRED`). Both are off by default. See [approval safeguards](docs/INTEGRATIONS.md#approval-safeguards).
+- `/metrics` reports `security_fusion_audit_append_failures`.
+- Scheduled encrypted backups for Compose installations: the opt-in `backup` service (`docker compose --profile backup up -d backup`) writes a recovery archive every `CINDERTRACE_BACKUP_INTERVAL_HOURS` (default 24) to `CINDERTRACE_BACKUP_DIR` (default `/state/backups`), verifies it, then keeps the newest `CINDERTRACE_BACKUP_RETAIN` (default 7). With `CINDERTRACE_BACKUP_MAX_AGE_HOURS` set, `/metrics` also reports `security_fusion_backup_max_age_seconds` and `security_fusion_backup_stale`. The upgrade command stops and restarts the service with the application. See [scheduled backups](docs/MIGRATION.md#scheduled-backups).
+- `GET /api/v1/audit/export` serves Cindertrace's own audit (approvals, evidence preservation, collector revocation, sign-ins and the rest) as HiveAuditRecord v1, oldest first, with the suite's `after`/`limit` paging; details are flattened and redacted with hive-common's `auditDetails()`. Readable by an ADMIN or by an endpoint-scoped credential (`SECURITY_AUDIT_EXPORT_TOKEN_SHA256`). See [Cindertrace's own audit](docs/INTEGRATIONS.md#cindertraces-own-audit).
+- `/sources` reports each suite audit source's last poll: `lastPollAt`, `lastPollRecords` and `lastPollPages`, next to its checkpoint and last error. The collector sends them with its source status.
+- More local accounts for standalone installations: `CINDERTRACE_LOCAL_ACCOUNTS_JSON` (or `_B64`) lists accounts with an Argon2id password hash, a role (`ADMIN`, `OPERATOR` or `VIEWER`) and an optional user ID, beside the administrator. Sessions carry the account's role, read live from the configuration; changing an account ends its sessions.
+- Optional TOTP (RFC 6238) per local account (`totpSecret`) and for the administrator (`CINDERTRACE_ADMIN_TOTP_SECRET`). Sign-in takes the code as `totp`; without it the API answers 401 with `totpRequired: true`. Each code works once. See [more local accounts](docs/BROWSER_AUTH.md#more-local-accounts-roles-and-totp).
+- Embermend findings collected from its audit export take their event severity from the finding (`details.severity`), and Embermend's `subject.nodeId` attaches a `host` entity, so findings and executions correlate with the host's other events.
 
 ### Changed
 
@@ -16,12 +24,29 @@
 - `npm run upgrade` now moves the `ui` service to the HiveXUI image the release pins. It pulls the image before the downtime, writes it to `.env` as `CINDERTRACE_UI_IMAGE`, restarts `ui` with the API and gateway and waits for it to be healthy; a rollback restores the previous `ui` image. An installation that runs another `ui` image (a mirror or its own build) keeps it. See [the HiveXUI ui image](docs/UPGRADING.md#the-hivexui-ui-image).
 - Console-era setting names have Cindertrace names: `CINDERTRACE_PUBLIC_ORIGIN`, `CINDERTRACE_ADMIN_USERNAME`, `CINDERTRACE_ADMIN_PASSWORD_HASH`, `CINDERTRACE_ADMIN_PASSWORD`, `CINDERTRACE_ADMIN_ACCOUNT_ID` (each also as `_B64` where it had one) and `SECURITY_APPROVAL_MODE=local`. The `DASHBOARD_*` names and `SECURITY_APPROVAL_MODE=console` keep working; the API refuses to start when both spellings of a setting disagree, or when `SECURITY_APPROVAL_MODE` is not `local`, `console` or `external`. `npm run init` writes the new names and no longer generates `SECURITY_CONSOLE_TOKEN_SECRET`. See [setting names](docs/INSTALLATION.md#setting-names), which also lists the console-era wire values that stay frozen.
 - New browser sessions carry issuer `cindertrace` and audience `cindertrace-browser` (unless `SESSION_ISSUER`/`SESSION_AUDIENCE` are set). Sessions issued with the old `cindertrace-console` values stay valid until they expire.
+- The VIEWER role (an Oathweave `cindertrace:view` link or a VIEWER local account) can now read the summary: `/overview` (severity counts and source health; its `openCases` list stays empty for VIEWER), `/sources` and `/policies`. Before, every route answered 403. Cases, events, entities and the inbox feed still need OPERATOR.
+- The read automation credential is no longer offered `GET /evidence`, which its OPERATOR role was always refused with 403.
+- `@hivemagnus/hive-common` 0.7.0 (from 0.5.0), which also fixes quadratic regular expressions in its `/health` and `/errors` helpers (Cindertrace's routes are fixed paths, so this is maintenance). Error messages are scrubbed with its `redactText()` instead of a local copy.
+- The image's build stage uses Node 26.13.1, the runtime's Node line (it used Node 24).
+- CI runs the Compose and lab jobs on Node 24 and 26, and a new `npm run test:gateway` signs in and calls the API through the published gateway, then checks that sign-in throttling applies per client and ignores a caller's own `X-Forwarded-For`.
+- The OpenAPI document's `info.version` is the API contract version (`1`) instead of a stale product version (`0.2.1`), and a test fails when the README's example image tag differs from the product version.
+
+### Fixed
+
+- A failed audit append after a committed request, approval, rejection, cancellation, expiry, evidence preservation or collector revocation no longer turns the reply into a 500. The change had already happened, so the client's retry was refused as `APPROVAL_ALREADY_USED`. The failure is now logged and counted in `security_fusion_audit_append_failures` instead.
+- Releasing an isolation waits (up to ten seconds) for the dispatcher before answering, so the reply and the case activity carry the Magnus command ID instead of almost always `null` and `release_pending`.
+- A malformed `SECURITY_PLUGIN_READ_DIGESTS_JSON` (it must map names to lowercase-hex SHA-256 digests) or `CINDERTRACE_OATHWEAVE_IDENTITIES_JSON` now stops the API at startup instead of failing every request with a 500. Both are parsed once per value instead of on every request.
 
 ### Upgrade notes
 
 - The managed upgrade now restarts `ui` when the release pins a different HiveXUI image, and writes `CINDERTRACE_UI_IMAGE` to `.env`. A `compose.override.yaml` that sets the `ui` image itself stops the upgrade; set `CINDERTRACE_UI_IMAGE` there instead.
 - Remove `SECURITY_CONSOLE_TOKEN_SECRET` from `.env` when convenient; it is ignored. Any script of your own that minted console tokens with it must sign in instead (local sign-in or Oathweave).
 - A `SECURITY_APPROVAL_MODE` value other than `local`, `console` or `external` now stops the API at startup.
+- This release adds an additive migration (`20261126000000_source_poll_stats`: three nullable columns on `security_fusion_source_state`); run the upgrade with migrations allowed. Upgrade the collector and the API together to see poll counts; either works with the other's older version.
+- Alert on `security_fusion_audit_append_failures` increasing: an audit append failure no longer fails the request.
+- Check `SECURITY_PLUGIN_READ_DIGESTS_JSON` and `CINDERTRACE_OATHWEAVE_IDENTITIES_JSON` before upgrading: an invalid value now stops the API. So does an invalid `CINDERTRACE_BACKUP_MAX_AGE_HOURS`, `SECURITY_APPROVAL_MAX_AUTH_AGE_SECONDS`, `SECURITY_APPROVAL_DISTINCT_APPROVER` or `CINDERTRACE_LOCAL_ACCOUNTS_JSON`.
+- The `backup` service is in the new `compose.yaml`. An installation's own `compose.yaml` is kept by `npm run upgrade`; take the new one from the release (keeping your changes) to use it.
+- Nothing changes for installations without extra local accounts or TOTP: the administrator signs in as before and keeps its sessions. Setting `CINDERTRACE_ADMIN_TOTP_SECRET` ends the administrator's current sessions. HiveXUI needs a code field before TOTP accounts can sign in through it.
 
 ## [0.9.0] - 2026-11-26
 

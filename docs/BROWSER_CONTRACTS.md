@@ -13,6 +13,13 @@ opaque and resumes strictly after the last row served, so rows that arrive meanw
 shift a page; a tampered cursor is a 400 `INVALID_CURSOR`. Filters must stay the same
 from page to page.
 
+Events (`observedAt`), evidence (`preservedAt`) and deletion receipts (chain sequence) are
+ordered by values that never change, so paging through them reads every row once. Cases and
+entities are ordered by last activity (`lastSeenAt`), which moves forward when new events
+correlate: a case or entity that gains activity while a client is paging jumps to the first
+page and is not repeated on the later ones. Start again from the first page to see such rows
+in their new place; nothing is lost, and the next refresh shows them first.
+
 After committing a reviewed change, run `npm run contracts:browser -- --output
 NEW_DIRECTORY` to export the exact immutable public contract blobs and their
 SHA-256 provenance. The artifact holds `index.ts`, `lab.ts`, `browser-auth.ts`,
