@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import type { ApiError } from "../types/index.js";
 import { getHiveContext } from "@hivemagnus/hive-common/hono";
-import { redactSecretText } from "../utils/redact.js";
+import { redactText } from "@hivemagnus/hive-common/log";
 
 /** Global error handler for Hono — returns structured ApiError JSON. */
 export function errorHandler(err: Error, c: Context): Response {
@@ -9,7 +9,7 @@ export function errorHandler(err: Error, c: Context): Response {
   const code = err instanceof HttpError ? err.code : "INTERNAL_ERROR";
   const message =
     err instanceof HttpError
-      ? redactSecretText(err.message)
+      ? redactText(err.message)
       : "Security service request failed";
 
   // Log only the error message and code — never the full error object,

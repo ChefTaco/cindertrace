@@ -10,7 +10,12 @@ before publication. Describe changes with Conventional Commits.
 installations and refuse to start without their explicit confirmation variable
 (for example `CINDERTRACE_RECOVERY_TEST_CONFIRM`); read each script's header first:
 `npm run test:core`, `test:recovery`, `test:upgrade`, `test:browser-auth`,
-`test:response`, `test:lab` and `test:lab:browser`.
+`test:response`, `test:lab`, `test:lab:browser` and `test:gateway`. `test:gateway` runs
+in a freshly initialized installation directory with the stack up: it signs in and calls
+the API through the gateway, then checks that repeated failed sign-ins throttle only the
+client that made them (it uses up that host's sign-in allowance for 15 minutes). CI runs
+the Compose and lab jobs on both supported Node lines (24 and 26); the image builds and
+runs on Node 26.
 
 Read the [privacy guidance](PRIVACY.md) before preparing fixtures or reports.
 Keep deployment-specific acceptance records outside this public repository;
