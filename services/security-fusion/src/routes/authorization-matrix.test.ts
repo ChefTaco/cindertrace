@@ -8,19 +8,18 @@ vi.mock("../db/index.js", () => ({
   },
 }));
 import { securityFusionRouter } from "./security-fusion.js";
+// VIEWER sees only the summary: overview counts, source health and retention policy.
+const summary = ["/overview", "/sources", "/policies"];
 const reads = [
   "/lab",
   "/lab/runs/id",
   "/lab/runs/id/comparison",
-  "/overview",
-  "/sources",
   "/source-registry",
   "/events",
   "/entities",
   "/entities/id",
   "/cases",
   "/cases/id",
-  "/policies",
 ];
 const evidence = ["/evidence", "/deletion-receipts", "/audit"];
 const mutations = [
@@ -47,6 +46,7 @@ const admin = [
 const nativeApproval = ["/actions/id/approve", "/actions/id/reject"];
 const bridge = [["GET", "/approval-plans"], ["GET", "/approval-plans/id"], ["POST", "/approval-decisions"]];
 const endpoints = [
+  ...summary.map((path) => ["GET", path, "summary"]),
   ...reads.map((path) => ["GET", path, "read"]),
   ["POST", "/cases/id/assurance/exposure/preview", "read"],
   ...evidence.map((path) => ["GET", path, "admin"]),
@@ -86,6 +86,7 @@ for (const role of ["VIEWER", "OPERATOR", "ADMIN"]) {
         : { body: JSON.stringify({ confirmed: true, planSha256: "a".repeat(64), previewSha256: "b".repeat(64) }) }),
     });
     const allowed =
+      category === "summary" ||
       (category === "read" && role !== "VIEWER") ||
       role === "ADMIN" ||
       (category === "mutate" && role === "OPERATOR");

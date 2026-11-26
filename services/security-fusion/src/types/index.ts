@@ -1,5 +1,6 @@
 export type UserRole = "ADMIN" | "OPERATOR" | "VIEWER";
 export type SecurityPermission =
+  | "security-fusion:summary"
   | "security-fusion:read"
   | "security-fusion:evidence:read";
 export interface AuthTokenPayload {
