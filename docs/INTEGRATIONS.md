@@ -155,11 +155,6 @@ credential reads nothing else).
 
 ## Hive
 
-Hive login uses the configured discovery URL, client ID, issuer, API audience,
-and Cindertrace public origin. It is optional; local login remains independent.
-Use a separately registered Cindertrace OAuth client and callback
-`/api/auth/hive/callback`.
-
 Security export uses the public Hive `security-exporter` client credentials with
 only `iam:audit:read router:security-events:read`. Configure
 `HIVE_IAM_SECURITY_URL`, `HIVE_IAM_SECURITY_CLIENT_ID`,
