@@ -6829,6 +6829,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 4096
+                  },
+                  "totp": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
                   }
                 },
                 "required": [

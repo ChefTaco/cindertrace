@@ -1,6 +1,6 @@
 import {applyRehearsalGuards,isRehearsal} from "./rehearsal.js";
 import {browserAuthEnabled,browserSessionSecret} from "../browser-auth/sessions.js";
-import {credentials} from "../browser-auth/credentials.js";
+import {credentials,localAccounts} from "../browser-auth/credentials.js";
 import {exactBrowserOrigin} from "../browser-auth/origin.js";
 import { validateLabIsolation } from "./lab-isolation.js";
 import { validateAuthLimitsConfig } from "./auth-limits.js";
@@ -39,6 +39,7 @@ export function validateRuntimeConfig(
     throw new Error("CINDERTRACE_BACKUP_MAX_AGE_HOURS must be a whole number of hours from 1 to 8760");
   if(browserAuthEnabled(env)){
     credentials(env);
+    localAccounts(env);
     browserSessionSecret(env);
     if(!exactBrowserOrigin(setting(env,"CINDERTRACE_PUBLIC_ORIGIN"),env))throw Error("Browser authentication requires an exact HTTPS public origin");
     if(env.AUTH_RATE_LIMIT_LABEL_KEY!==undefined&&env.AUTH_RATE_LIMIT_LABEL_KEY.length<32)throw Error("Authentication labels require a dedicated secret of at least 32 characters");

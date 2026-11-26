@@ -3,8 +3,7 @@ import { Redis } from "ioredis";
 import { SignJWT, jwtVerify } from "jose";
 import { z } from "zod";
 import { configuredOathweaveVerifier, linkedSecurityIdentity, type OathweaveIdentity } from "../middleware/oathweave.js";
-import { credentials } from "./credentials.js";
-import { setting } from "../config/settings.js";
+import { credentials, localAccount, type LocalAccount } from "./credentials.js";
 // Session tokens carried the retired console's issuer and audience until 0.9.x. New
 // sessions use Cindertrace's own; verification still accepts the old pair while
 // sessions issued before the upgrade (24 hours at most) run out.
@@ -87,8 +86,26 @@ export class BrowserSessions {
   key(username: string): string {
     return `${COOKIE_NAME}:local:${createHmac("sha256", this.secret()).update(username).digest("hex")}`;
   }
-  credentialGeneration(): string {
-    const value = credentials(this.env);
+  /**
+   * What a local session is bound to: changing it revokes the account's sessions. The
+   * administrator without TOTP keeps the original binding, so existing sessions survive an
+   * upgrade; other accounts also bind their role, and TOTP binds the secret's digest.
+   */
+  credentialGeneration(account: LocalAccount | string = credentials(this.env).username): string {
+    const value = typeof account === "string" ? localAccount(account, this.env) : account;
+    if (!value) throw Error("Unknown local account");
+    const base = this.baseGeneration(value);
+    if (value.administrator && !value.totpSecret) return base;
+    return createHmac("sha256", this.secret())
+      .update(JSON.stringify([
+        base,
+        value.administrator ? null : [value.role, value.userId],
+        value.totpSecret ? createHmac("sha256", this.secret()).update(value.totpSecret).digest("hex") : null,
+      ]))
+      .digest("hex");
+  }
+  /** The binding of releases before more local accounts, kept exactly for the administrator. */
+  private baseGeneration(value: Pick<LocalAccount, "username" | "password" | "passwordHash">): string {
     return createHmac("sha256", this.secret())
       .update(
         JSON.stringify([
@@ -99,7 +116,19 @@ export class BrowserSessions {
       )
       .digest("hex");
   }
+  /** Use a TOTP time step once per account: true if `step` is later than any used before. */
+  async consumeTotpStep(username: string, step: number): Promise<boolean> {
+    const used = await this.store.eval(
+      "local last = tonumber(redis.call('GET', KEYS[1]) or '-1') if tonumber(ARGV[1]) <= last then return 0 end redis.call('SET', KEYS[1], ARGV[1], 'EX', 300) return 1",
+      1,
+      this.key(username) + ":totp-step",
+      String(step),
+    );
+    return Number(used) === 1;
+  }
   async create(username: string): Promise<string> {
+    const account = localAccount(username, this.env);
+    if (!account) throw Error("Unknown local account");
     const id = randomUUID(),
       key = this.key(username);
     await this.store.eval(
@@ -110,7 +139,7 @@ export class BrowserSessions {
       `${key}:session:${id}`,
       randomUUID(),
       id,
-      this.credentialGeneration(),
+      this.credentialGeneration(account),
       SESSION_DURATION,
       Math.floor(Date.now() / 1000),
       `${key}:session:`,
@@ -118,8 +147,8 @@ export class BrowserSessions {
     return new SignJWT({
       username,
       sessionId: id,
-      role: "ADMIN",
-      userId: setting(this.env, "CINDERTRACE_ADMIN_ACCOUNT_ID") ?? username,
+      role: account.role,
+      userId: account.userId,
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer(this.issuer())
@@ -171,17 +200,18 @@ export class BrowserSessions {
         return {...session,role:linked.role,...(identity.authenticatedAt!==undefined?{authenticatedAt:identity.authenticatedAt}:{})};
       } catch {return null;}
     }
-    // Only local administrator sessions remain; any other provider is refused.
-    if (session.provider || session.username !== credentials(this.env).username)
-      return null;
+    // Local accounts only; any other provider is refused. The role and user ID come from
+    // the current account configuration, not from the token.
+    const account = session.provider ? undefined : localAccount(session.username, this.env);
+    if (!account) return null;
     const key = this.key(session.username);
     const [generation, record] = await this.store.mget(
       `${key}:generation`,
       `${key}:session:${session.sessionId}`,
     );
     return generation &&
-      record === `${generation}:${this.credentialGeneration()}`
-      ? session
+      record === `${generation}:${this.credentialGeneration(account)}`
+      ? { ...session, role: account.role, userId: account.userId }
       : null;
   }
   async revoke(session: BrowserSession, all = false): Promise<void> {
