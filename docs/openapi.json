@@ -2800,7 +2800,29 @@
             "bearerAuth": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque cursor from the previous page's nextCursor; the page holds the rows after it.",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size, 1 to 250 (default 100; 250 for evidence and deletion receipts).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Product-owned browser response",
@@ -2880,11 +2902,18 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
                     "success",
-                    "data"
+                    "data",
+                    "nextCursor"
                   ],
                   "additionalProperties": false,
                   "$defs": {
@@ -2956,7 +2985,29 @@
             "bearerAuth": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque cursor from the previous page's nextCursor; the page holds the rows after it.",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size, 1 to 250 (default 100; 250 for evidence and deletion receipts).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Product-owned browser response",
@@ -3001,11 +3052,18 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
                     "success",
-                    "data"
+                    "data",
+                    "nextCursor"
                   ],
                   "additionalProperties": false
                 }
@@ -3137,6 +3195,27 @@
               "minLength": 1,
               "maxLength": 512
             }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque cursor from the previous page's nextCursor; the page holds the rows after it.",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size, 1 to 250 (default 100; 250 for evidence and deletion receipts).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            }
           }
         ],
         "responses": {
@@ -3216,11 +3295,18 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
                     "success",
-                    "data"
+                    "data",
+                    "nextCursor"
                   ],
                   "additionalProperties": false
                 }
@@ -4802,7 +4888,29 @@
             "bearerAuth": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque cursor from the previous page's nextCursor; the page holds the rows after it.",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size, 1 to 250 (default 100; 250 for evidence and deletion receipts).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Product-owned browser response",
@@ -4846,11 +4954,18 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
                     }
                   },
                   "required": [
                     "success",
-                    "data"
+                    "data",
+                    "nextCursor"
                   ],
                   "additionalProperties": false
                 }
@@ -4889,7 +5004,29 @@
             "bearerAuth": []
           }
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Opaque cursor from the previous page's nextCursor; the page holds the rows after it.",
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size, 1 to 250 (default 100; 250 for evidence and deletion receipts).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response"

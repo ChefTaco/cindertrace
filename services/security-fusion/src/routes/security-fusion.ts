@@ -60,6 +60,7 @@ import {
   recordContainmentApproval,
 } from "../services/senti-containment-approval.js";
 import { incMetric } from "./metrics.js";
+import { after, newestFirst, page, readPosition } from "./pagination.js";
 
 export const securityFusionRouter = new Hono<AppVariables>();
 
@@ -595,14 +596,20 @@ securityFusionRouter.get("/events", async (c) => {
   const source = c.req.query("source");
   const kind = c.req.query("kind");
   const limit = boundedQueryInteger(c.req.query("limit"), 100, 1, 250);
-  const rows = await getDb().securityFusionEvent.findMany({
-    where: {
-      ...(source ? { source } : {}),
-      ...(kind ? { kind: { contains: kind } } : {}),
-    },
-    orderBy: { observedAt: "desc" },
-    take: limit,
-  });
+  const position = readPosition(c.req.query("cursor"), "time");
+  const { rows, nextCursor } = page(
+    await getDb().securityFusionEvent.findMany({
+      where: {
+        ...(source ? { source } : {}),
+        ...(kind ? { kind: { contains: kind } } : {}),
+        ...after("observedAt", position),
+      },
+      orderBy: newestFirst("observedAt"),
+      take: limit + 1,
+    }),
+    limit,
+    (row) => row.observedAt,
+  );
   const includeEvidenceAttributes = hasPermission(
     getUser(c),
     "security-fusion:evidence:read",
@@ -615,16 +622,23 @@ securityFusionRouter.get("/events", async (c) => {
         includeEvidenceAttributes,
       ),
     ),
+    nextCursor,
   });
 });
 
 securityFusionRouter.get("/entities", async (c) => {
   const type = c.req.query("type");
-  const rows = await getDb().securityFusionEntity.findMany({
-    where: type ? { type } : {},
-    orderBy: { lastSeenAt: "desc" },
-    take: 100,
-  });
+  const limit = boundedQueryInteger(c.req.query("limit"), 100, 1, 250);
+  const position = readPosition(c.req.query("cursor"), "time");
+  const { rows, nextCursor } = page(
+    await getDb().securityFusionEntity.findMany({
+      where: { ...(type ? { type } : {}), ...after("lastSeenAt", position) },
+      orderBy: newestFirst("lastSeenAt"),
+      take: limit + 1,
+    }),
+    limit,
+    (row) => row.lastSeenAt,
+  );
   return c.json({
     success: true,
     data: rows.map((row) => ({
@@ -632,6 +646,7 @@ securityFusionRouter.get("/entities", async (c) => {
       aliases: json(row.aliasesJson),
       aliasesJson: undefined,
     })),
+    nextCursor,
   });
 });
 
@@ -679,6 +694,8 @@ securityFusionRouter.get("/cases", async (c) => {
   const archived = c.req.query("archived") === "true";
   const entityType = c.req.query("entityType");
   const entity = c.req.query("entity");
+  const limit = boundedQueryInteger(c.req.query("limit"), 100, 1, 250);
+  const position = readPosition(c.req.query("cursor"), "time");
   let caseIds: string[] | undefined;
   if (entityType !== undefined || entity !== undefined) {
     const filter = securityFusionCaseEntityFilterSchema.safeParse({ entityType, entity });
@@ -692,8 +709,9 @@ securityFusionRouter.get("/cases", async (c) => {
       filter.data.entityType,
       filter.data.entity,
     );
-    if (entityIds.length === 0) return c.json({ success: true, data: [] });
-    // Join through case entity links in the database so the newest 100 cases are exact.
+    if (entityIds.length === 0) return c.json({ success: true, data: [], nextCursor: null });
+    // Join through case entity links in the database so each page of newest cases is exact.
+    const cursorAt = position ? (position.at as Date).toISOString() : null, cursorId = position?.id ?? null;
     const linked = await getDb().$queryRaw<Array<{ id: string }>>`
       SELECT c."id" FROM "security_fusion_cases" c
       WHERE (${status || null}::text IS NULL OR c."status" = ${status || null}::text)
@@ -702,25 +720,33 @@ securityFusionRouter.get("/cases", async (c) => {
           SELECT 1 FROM "security_fusion_case_entities" ce
           WHERE ce."caseId" = c."id" AND ce."entityId" = ANY(${entityIds}::text[])
         )
-      ORDER BY c."lastSeenAt" DESC
-      LIMIT 100`;
+        AND (${cursorAt}::timestamp(3) IS NULL OR c."lastSeenAt" < ${cursorAt}::timestamp(3)
+          OR (c."lastSeenAt" = ${cursorAt}::timestamp(3) AND c."id" < ${cursorId}::text))
+      ORDER BY c."lastSeenAt" DESC, c."id" DESC
+      LIMIT ${limit + 1}`;
     caseIds = linked.map((row) => row.id);
-    if (caseIds.length === 0) return c.json({ success: true, data: [] });
+    if (caseIds.length === 0) return c.json({ success: true, data: [], nextCursor: null });
   }
-  const rows = await getDb().securityFusionCase.findMany({
-    where: {
-      ...(status ? { status } : {}),
-      archivedAt: archived ? { not: null } : null,
-      ...(caseIds ? { id: { in: caseIds } } : {}),
-    },
-    orderBy: { lastSeenAt: "desc" },
-    take: 100,
-  });
+  const { rows, nextCursor } = page(
+    await getDb().securityFusionCase.findMany({
+      where: {
+        ...(status ? { status } : {}),
+        archivedAt: archived ? { not: null } : null,
+        ...(caseIds ? { id: { in: caseIds } } : {}),
+        ...after("lastSeenAt", position),
+      },
+      orderBy: newestFirst("lastSeenAt"),
+      take: limit + 1,
+    }),
+    limit,
+    (row) => row.lastSeenAt,
+  );
   return c.json({
     success: true,
     data: rows.map((row) =>
       serializeCase(row as unknown as Record<string, unknown>),
     ),
+    nextCursor,
   });
 });
 
@@ -1019,13 +1045,18 @@ securityFusionRouter.get(
   "/evidence",
   requirePermission("security-fusion:evidence:read"),
   async (c) => {
-    return c.json({
-      success: true,
-      data: await getDb().securityFusionEvidence.findMany({
-        orderBy: { preservedAt: "desc" },
-        take: 250,
+    const limit = boundedQueryInteger(c.req.query("limit"), 250, 1, 250);
+    const position = readPosition(c.req.query("cursor"), "time");
+    const { rows, nextCursor } = page(
+      await getDb().securityFusionEvidence.findMany({
+        where: after("preservedAt", position),
+        orderBy: newestFirst("preservedAt"),
+        take: limit + 1,
       }),
-    });
+      limit,
+      (row) => row.preservedAt,
+    );
+    return c.json({ success: true, data: rows, nextCursor });
   },
 );
 
@@ -1033,19 +1064,24 @@ securityFusionRouter.get(
   "/deletion-receipts",
   requirePermission("security-fusion:evidence:read"),
   async (c) => {
-    const [receipts, chainHead] = await Promise.all([
+    const limit = boundedQueryInteger(c.req.query("limit"), 250, 1, 250);
+    const position = readPosition(c.req.query("cursor"), "sequence");
+    const [rows, chainHead] = await Promise.all([
       getDb().securityFusionDeletionReceipt.findMany({
-        orderBy: { chainSequence: "desc" },
-        take: 250,
+        where: after("chainSequence", position),
+        orderBy: newestFirst("chainSequence"),
+        take: limit + 1,
       }),
       getDb().securityFusionReceiptChainHead.findUnique({
         where: { id: "security-fusion" },
         select: { headSha256: true, chainSequence: true, updatedAt: true },
       }),
     ]);
+    const { rows: receipts, nextCursor } = page(rows, limit, (row) => row.chainSequence);
     return c.json({
       success: true,
       data: { receipts, chainHead },
+      nextCursor,
     });
   },
 );

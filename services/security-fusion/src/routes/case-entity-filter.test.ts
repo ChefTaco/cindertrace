@@ -111,13 +111,14 @@ describe("GET /cases entity filter", () => {
           evidenceSteps: [],
         },
       ],
+      nextCursor: null,
     });
     expect(state.queryRaw).not.toHaveBeenCalled();
     expect(state.resolve).not.toHaveBeenCalled();
     expect(state.caseFindMany.mock.calls[0]![0]).toEqual({
       where: { status: "new", archivedAt: null },
-      orderBy: { lastSeenAt: "desc" },
-      take: 100,
+      orderBy: [{ lastSeenAt: "desc" }, { id: "desc" }],
+      take: 101,
     });
   });
 
@@ -144,7 +145,7 @@ describe("GET /cases entity filter", () => {
     const response = await request("?entityType=host&entity=unknown", {
       Authorization: `Bearer ${await consoleToken("OPERATOR")}`,
     });
-    expect(await response.json()).toEqual({ success: true, data: [] });
+    expect(await response.json()).toEqual({ success: true, data: [], nextCursor: null });
     expect(state.queryRaw).not.toHaveBeenCalled();
     expect(state.caseFindMany).not.toHaveBeenCalled();
   });
