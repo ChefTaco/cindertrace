@@ -10,7 +10,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import { bodyLimitMiddleware } from "./middleware/body-limit.js";
 import { tokenMatches } from "./middleware/auth.js";
 import { getDb } from "./db/index.js";
-import { renderMetrics } from "./routes/metrics.js";
+import { backupStaleness, renderMetrics } from "./routes/metrics.js";
 import type { AppVariables } from "./types/index.js";
 import { oathweaveBrowserRouter } from './browser-auth/oathweave-routes.js';
 import { browserAuthRouter } from './browser-auth/routes.js';
@@ -84,8 +84,10 @@ app.get("/metrics", async (c) => {
       ),
     );
     extra += `\nsecurity_fusion_backup_last_success_seconds ${Date.parse(status.completedAt) / 1000}`;
+    extra += backupStaleness(Date.parse(status.completedAt));
   } catch {
     extra += "\nsecurity_fusion_backup_last_success_seconds 0";
+    extra += backupStaleness(0);
   }
   return c.text(renderMetrics() + extra + "\n");
 });

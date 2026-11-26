@@ -74,6 +74,7 @@ test("runtime staging preserves nested versions and licences while excluding opt
     file("services/security-fusion/scripts/apply-migrations.mjs", "// fixture");
     for (const name of [
       "backup.mjs",
+      "backup-schedule.mjs",
       "core-integration.mjs",
       "recovery-integration.mjs",
       "demo.mjs",

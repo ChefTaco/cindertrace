@@ -70,6 +70,39 @@ regularly. Configured HTTPS receivers may require the generated
 `security-YYYYMMDDTHHMMSSZ.aes` name; omit the filename for an automatic backup name
 instead of using the illustrative `security.aes` above.
 
+## Scheduled backups
+
+Compose installations can run backups on a schedule with the opt-in `backup` service:
+
+```sh
+docker compose --profile backup up -d backup
+```
+
+It runs the same `scripts/backup.mjs` with the API's environment, on the application image,
+while the API keeps running (the database is read from one consistent snapshot). Each run
+writes `security-YYYYMMDDTHHMMSSZ.aes` to `CINDERTRACE_BACKUP_DIR` (default
+`/state/backups`, so `state/backups` in the installation directory), verifies it, and only
+then deletes the oldest archives beyond `CINDERTRACE_BACKUP_RETAIN` (default 7). An archive
+that fails verification is renamed `*.aes.unverified` and kept out of the rotation; a failed
+run deletes nothing and is retried after an hour. Runs repeat every
+`CINDERTRACE_BACKUP_INTERVAL_HOURS` (default 24, at most 168), starting when the service
+starts. Run one now with
+`docker compose --profile backup run --rm backup node scripts/backup-schedule.mjs --once`.
+
+These archives sit on the installation's own disk and are encrypted with
+`SECURITY_BACKUP_ENCRYPTION_KEY` from the same `.env`: keep a copy of that key elsewhere,
+and set `SECURITY_BACKUP_UPLOAD_URL` (HTTPS) and `SECURITY_BACKUP_TOKEN` so each archive is
+also sent off-host, or copy `state/backups` off-host yourself. A scheduled archive holds the
+database, evidence, audit files and receipt ledger, not `.env` or the TLS key; back those
+up separately (the managed upgrade's own archive includes them).
+
+Every successful backup updates `security_fusion_backup_last_success_seconds` in `/metrics`.
+Set `CINDERTRACE_BACKUP_MAX_AGE_HOURS` (for example 26 with daily backups) to also report
+`security_fusion_backup_max_age_seconds` and `security_fusion_backup_stale`, which is 1 when
+the last successful backup is older than that, or there is none; alert on it. The upgrade
+command stops the `backup` service with the other application services and starts it again
+afterwards if it was running.
+
 ## Rollback and stabilization
 
 Before destination writes, restore the prior verified application with its

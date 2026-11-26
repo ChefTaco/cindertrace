@@ -98,3 +98,32 @@ test("activation writes and starts ui only when its image changes", async () => 
     rmSync(root, { recursive: true });
   }
 });
+test("the upgrade stops a scheduled backup service and starts it again only if it ran", async () => {
+  const root = mkdtempSync(join(tmpdir(), "compose-upgrade-"));
+  try {
+    writeFileSync(join(root, ".env"), "CINDERTRACE_IMAGE=cindertrace:local\n", { mode: 0o600 });
+    writeFileSync(join(root, "compose.yaml"), "image: ${CINDERTRACE_IMAGE:-cindertrace:local}\n");
+    const calls = [];
+    const install = new ComposeInstallation(root, async (args) => {
+      const file = args.lastIndexOf("-f");
+      calls.push({ file: args[file + 1], args: args.slice(file + 2) });
+      return "";
+    });
+    install.before = { services: { api: {}, gateway: {}, collector: {}, migrate: {} } };
+    assert.deepEqual(install.appServices(), ["api", "gateway", "collector", "migrate"]);
+    await install.pause({});
+    assert.deepEqual(calls.at(-1).args, ["stop", "gateway", "collector", "api"]);
+    install.before.services.backup = {};
+    assert.deepEqual(install.appServices().at(-1), "backup");
+    await install.pause({});
+    assert.deepEqual(calls.at(-1).args, ["stop", "gateway", "collector", "backup", "api"]);
+    calls.length = 0;
+    await install.startOptional({ collectorEnabled: false, backupEnabled: true });
+    assert.deepEqual(calls.map((call) => call.args), [["--profile", "backup", "up", "-d", "--no-build", "--pull", "never", "--no-deps", "backup"]]);
+    calls.length = 0;
+    await install.startOptional({ collectorEnabled: true, backupEnabled: false }, "/before.json");
+    assert.deepEqual(calls, [{ file: "/before.json", args: ["--profile", "collector", "up", "-d", "--no-build", "--pull", "never", "--no-deps", "collector"] }]);
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});

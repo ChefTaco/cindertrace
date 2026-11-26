@@ -24,6 +24,8 @@ const probe = readFileSync(
   "utf8",
 );
 const appServices = ["api", "gateway", "collector", "migrate"];
+// Opt-in services on the application image, started again after an upgrade only if they ran.
+const optionalServices = ["collector", "backup"];
 const releaseUi = /^ghcr\.io\/cheftaco\/hivexui(?::[A-Za-z0-9._-]+)?@sha256:[a-f0-9]{64}$/;
 /** Remove keys from an env file's text, keeping every other line as written. */
 export function withoutKeys(text, keys) {
@@ -221,7 +223,7 @@ export class ComposeInstallation {
         this.before.services[n]?.image,
         "Database/cache image changes require a separate tested infrastructure upgrade",
       );
-    for (const n of appServices) {
+    for (const n of this.appServices()) {
       assert.deepEqual(
         candidate.services[n]?.command,
         this.before.services[n]?.command,
@@ -281,7 +283,7 @@ export class ComposeInstallation {
         "json",
       ]),
     );
-    for (const n of appServices)
+    for (const n of this.appServices())
       assert.equal(
         selected.services[n].image,
         this.image,
@@ -301,10 +303,14 @@ export class ComposeInstallation {
         await this.compose(["--profile", "collector", "ps", "-q", "collector"])
       ).trim(),
     );
+    record.backupEnabled = Boolean(
+      this.before.services.backup &&
+        (await this.compose(["--profile", "backup", "ps", "-q", "backup"])).trim(),
+    );
     const rollbackImage = "cindertrace:rollback-" + record.id;
     await this.run(["docker", "image", "tag", this.oldImage, rollbackImage]);
     record.rollbackImage = rollbackImage;
-    for (const n of appServices) this.before.services[n].image = rollbackImage;
+    for (const n of this.appServices()) this.before.services[n].image = rollbackImage;
     this.beforeFile = this.saveConfig(record, "before", this.before);
     record.beforeFile = this.beforeFile;
     record.directory = resolve(record.directory);
@@ -323,8 +329,22 @@ export class ComposeInstallation {
       migrations,
     };
   }
+  /** Application services this installation defines (`backup` only in newer compose files). */
+  appServices() {
+    return [...appServices, ...(this.before?.services?.backup ? ["backup"] : [])];
+  }
+  /** Start the opt-in services that ran before the upgrade, from `file` when given. */
+  async startOptional(record, file) {
+    for (const name of optionalServices)
+      if (record[name + "Enabled"])
+        await this.compose(
+          ["--profile", name, "up", "-d", "--no-build", "--pull", "never", "--no-deps", name],
+          file ? { file } : {},
+        );
+  }
   async pause(record) {
-    await this.compose(["stop", "gateway", "collector", "api"]);
+    // A scheduled backup must not run while the upgrade changes the database.
+    await this.compose(["stop", "gateway", "collector", ...(this.before?.services?.backup ? ["backup"] : []), "api"]);
     atomicPrivate(
       this.envFile,
       patchEnvironment(
@@ -500,7 +520,7 @@ export class ComposeInstallation {
   }
   async migrate(record) {
     const cfg = structuredClone(this.before);
-    for (const n of appServices) {
+    for (const n of this.appServices()) {
       cfg.services[n].image = record.image;
       delete cfg.services[n].build;
       Object.assign(
@@ -608,18 +628,7 @@ export class ComposeInstallation {
       "120",
       ...this.startServices(record),
     ]);
-    if (record.collectorEnabled)
-      await this.compose([
-        "--profile",
-        "collector",
-        "up",
-        "-d",
-        "--no-build",
-        "--pull",
-        "never",
-        "--no-deps",
-        "collector",
-      ]);
+    await this.startOptional(record);
     await this.healthy(record);
   }
   async rollback(record) {
@@ -646,21 +655,7 @@ export class ComposeInstallation {
       ],
       { file: record.beforeFile },
     );
-    if (record.collectorEnabled)
-      await this.compose(
-        [
-          "--profile",
-          "collector",
-          "up",
-          "-d",
-          "--no-build",
-          "--pull",
-          "never",
-          "--no-deps",
-          "collector",
-        ],
-        { file: record.beforeFile },
-      );
+    await this.startOptional(record, record.beforeFile);
     await this.healthy();
   }
 }
