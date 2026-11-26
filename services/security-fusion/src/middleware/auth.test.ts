@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { Hono } from "hono";
 import { createHash } from "node:crypto";
 import { SignJWT } from "jose";
-import { authMiddleware, requirePermission, requireRole, safeEqual, tokenMatches } from "./auth.js";
+import { authMiddleware, hasPermission, pluginReadDigests, requirePermission, requireRole, safeEqual, tokenMatches } from "./auth.js";
 import type { AppVariables } from "../types/index.js";
 import { errorHandler } from "./error-handler.js";
 const app = new Hono<AppVariables>();
@@ -10,6 +10,7 @@ app.onError(errorHandler);
 app.use("*", authMiddleware, requirePermission("security-fusion:read"));
 app.get("/api/v1/security-fusion/cases", (c) => c.json({ ok: true }));
 app.get("/api/v1/security-fusion/sources", (c) => c.json({ ok: true }));
+app.get("/api/v1/security-fusion/evidence", (c) => c.json({ ok: true }));
 app.post(
   "/api/v1/security-fusion/actions/x/approve",
   requireRole("ADMIN"),
@@ -17,6 +18,29 @@ app.post(
 );
 afterEach(() => vi.unstubAllEnvs());
 describe("independent authorization", () => {
+  it("confines the read credential to routes its role can serve", async () => {
+    const token = "r".repeat(40);
+    vi.stubEnv("SECURITY_PLUGIN_READ_DIGESTS_JSON", JSON.stringify({ agent: createHash("sha256").update(token).digest("hex") }));
+    const status = async (path: string) =>
+      (await app.request("/api/v1/security-fusion" + path, { headers: { Authorization: `Bearer ${token}` } })).status;
+    expect(await status("/cases")).toBe(200);
+    expect(await status("/sources")).toBe(200);
+    // Evidence needs ADMIN; the allowlist no longer offers what the role always refused.
+    expect(await status("/evidence")).toBe(403);
+  });
+  it("validates the read credential registry", () => {
+    const digest = "a".repeat(64);
+    expect(pluginReadDigests({})).toEqual({});
+    expect(pluginReadDigests({ SECURITY_PLUGIN_READ_DIGESTS_JSON: JSON.stringify({ agent: digest }) })).toEqual({ agent: digest });
+    for (const raw of ["{", "[]", "null", JSON.stringify({ agent: "A".repeat(64) }), JSON.stringify({ agent: 1 }), JSON.stringify({ "bad name": digest })])
+      expect(() => pluginReadDigests({ SECURITY_PLUGIN_READ_DIGESTS_JSON: raw }), raw).toThrow(/SECURITY_PLUGIN_READ_DIGESTS_JSON/);
+  });
+  it("gives VIEWER the summary only", () => {
+    const viewer = { userId: "v", email: "", role: "VIEWER" as const, iat: 0, exp: 0 };
+    expect(hasPermission(viewer, "security-fusion:summary")).toBe(true);
+    expect(hasPermission(viewer, "security-fusion:read")).toBe(false);
+    expect(hasPermission({ ...viewer, role: "OPERATOR" }, "security-fusion:evidence:read")).toBe(false);
+  });
   it("confines the Aegis workflow identity to case, evidence, preview and request lifecycle", async () => {
     const token = "w".repeat(40);
     vi.stubEnv("SECURITY_PLUGIN_WORKFLOW_TOKEN_SHA256", createHash("sha256").update(token).digest("hex"));

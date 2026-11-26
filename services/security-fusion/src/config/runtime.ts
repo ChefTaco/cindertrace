@@ -7,6 +7,8 @@ import { validateAuthLimitsConfig } from "./auth-limits.js";
 import { parseTrustedProxies } from "../utils/client-address.js";
 import { setting, validateSettingAliases } from "./settings.js";
 import { approvalPolicy } from "./approval-policy.js";
+import { pluginReadDigests } from "../middleware/auth.js";
+import { linkedIdentityLinks } from "../middleware/oathweave.js";
 /** Validate enabled capabilities without requiring any optional product. */
 import { configuredCollectorCredentials } from "../services/security-fusion-ingest.js";
 export function responseConfigured(
@@ -24,6 +26,9 @@ export function validateRuntimeConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): void {
   validateSettingAliases(env);
+  // Automation credentials and identity links: refuse to start instead of failing each request.
+  pluginReadDigests(env);
+  linkedIdentityLinks(env["CINDERTRACE_OATHWEAVE_IDENTITIES_JSON"]);
   applyRehearsalGuards(env);
   validateLabIsolation(env);
   validateAuthLimitsConfig(env);

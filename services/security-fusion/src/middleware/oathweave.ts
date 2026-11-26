@@ -95,12 +95,19 @@ export function configuredOathweaveVerifier(): OathweaveVerify | undefined {
 }
 
 const LINK_ROLES = ['ADMIN', 'OPERATOR', 'VIEWER'] as const;
+let linkCache: { raw: string; links: ReturnType<typeof parseIdentityLinks> } | undefined;
+/** CINDERTRACE_OATHWEAVE_IDENTITIES_JSON, parsed once per value. Startup validation calls it. */
+export function linkedIdentityLinks(raw = '[]'): ReturnType<typeof parseIdentityLinks> {
+  if (linkCache?.raw !== raw)
+    // A duplicated link grants nothing to that identity; other links keep working.
+    linkCache = { raw, links: parseIdentityLinks(raw, { roles: LINK_ROLES, duplicates: 'ignore' }) };
+  return linkCache.links;
+}
 export function linkedSecurityIdentity(
   identity: Pick<OathweaveIdentity, 'issuer' | 'subject' | 'permissions'>,
   raw = process.env['CINDERTRACE_OATHWEAVE_IDENTITIES_JSON'] ?? '[]',
 ): AuthTokenPayload {
-  // A duplicated link grants nothing to that identity; other links keep working.
-  const links = parseIdentityLinks(raw, { roles: LINK_ROLES, duplicates: 'ignore' });
+  const links = linkedIdentityLinks(raw);
   const link = requireIdentityLink(links, identity);
   let role: UserRole;
   if (
