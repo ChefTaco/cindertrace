@@ -30,7 +30,7 @@ const db = {
   securityFusionCaseActivity: { create: vi.fn(async ({ data }: any) => state.activity.push(data)) },
 };
 vi.mock("../db/index.js", () => ({ getDb: () => db }));
-vi.mock("./audit-service.js", () => ({ logAuditEvent: vi.fn(async (entry: unknown) => state.audit.push(entry)) }));
+vi.mock("./audit-service.js", () => ({ auditCommitted: vi.fn(async (entry: unknown) => state.audit.push(entry)) }));
 import {
   ACTION_APPROVAL_TTL_MS,
   cancelSecurityFusionAction,

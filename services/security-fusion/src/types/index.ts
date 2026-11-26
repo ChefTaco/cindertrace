@@ -8,6 +8,8 @@ export interface AuthTokenPayload {
   role: UserRole;
   iat: number;
   exp: number;
+  /** When the person last proved their credentials (ms since epoch), where known. */
+  authenticatedAt?: number;
 }
 export type AppVariables = { Variables: { user: AuthTokenPayload } };
 export type AuditAction = string;

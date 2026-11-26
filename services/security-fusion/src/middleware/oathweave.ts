@@ -129,5 +129,7 @@ export async function oathweaveAuthentication(
   if (algorithm !== 'RS256') return undefined;
   const verify = configuredOathweaveVerifier();
   if (!verify) throw new Error('Identity integration is not configured');
-  return linkedSecurityIdentity(await verify(token));
+  const identity = await verify(token);
+  const user = linkedSecurityIdentity(identity);
+  return identity.authenticatedAt !== undefined ? { ...user, authenticatedAt: identity.authenticatedAt } : user;
 }

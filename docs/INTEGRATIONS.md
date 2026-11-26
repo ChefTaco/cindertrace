@@ -219,6 +219,36 @@ within ten minutes are cancelled (case activity `containment.expired`, approval 
 `expired`, audit `security_fusion.action.expire`). Operator cancellation is recorded
 the same way (`containment.cancelled`, `security_fusion.action.cancel`).
 
+Releasing an isolation waits up to ten seconds for the dispatcher, so the reply and the
+`isolation.release_requested` case activity name the Magnus command when it was sent in
+time; otherwise the action reports `release_pending` and the dispatcher sends it on its
+next pass.
+
+#### Approval safeguards
+
+Two optional settings tighten who may approve a response action. Both are off by default;
+the API refuses to start with an invalid value.
+
+- `SECURITY_APPROVAL_MAX_AUTH_AGE_SECONDS` (60 to 86400): an approver must have signed in
+  within this many seconds. A local session counts from its sign-in; an Oathweave session
+  uses the identity provider's sign-in time (`auth_time`), and one without it is refused.
+  An older session gets 401 `REAUTHENTICATION_REQUIRED`: sign out and in again, then
+  approve. A local session otherwise lasts 24 hours, so 900 (15 minutes) is a sensible value.
+- `SECURITY_APPROVAL_DISTINCT_APPROVER=true`: the administrator who previewed or requested
+  an action cannot approve it (403 `DISTINCT_APPROVER_REQUIRED`); another administrator
+  must. Anyone may still reject. With a single local administrator this blocks local
+  approval, so use it with several administrators (Oathweave) or external approval.
+
+#### Audit after a committed change
+
+Requests, approvals and rejections, cancellations, expiries, evidence preservation and
+collector revocation are written to the database first and audited after the commit. If
+the audit append then fails (for example a full or read-only `AUDIT_LOG_DIR`), the change
+stands and the request still succeeds, so a retry is not refused as already used. The
+failure is logged on stderr without the entry's details and counted in `/metrics` as
+`security_fusion_audit_append_failures`; alert on any increase. The case activity written
+with the change still records it.
+
 ## Automation credentials
 
 Read and investigation-draft credentials remain endpoint-scoped. They cannot

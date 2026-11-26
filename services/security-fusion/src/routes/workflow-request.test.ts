@@ -18,7 +18,7 @@ vi.mock('../db/index.js', () => ({ getDb: () => ({
     }},
   }),
 }) }));
-vi.mock('../services/audit-service.js', () => ({logAuditEvent:vi.fn(),queryAuditEvents:vi.fn()}));
+vi.mock('../services/audit-service.js', () => ({logAuditEvent:vi.fn(),auditCommitted:vi.fn(),queryAuditEvents:vi.fn()}));
 import { securityFusionRouter } from './security-fusion.js';
 const app=new Hono();
 app.onError((e,c)=>c.json({error:e.message},(e as any).status??500));
