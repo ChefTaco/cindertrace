@@ -484,7 +484,7 @@ export class ComposeInstallation {
    * (the command keeps that file). An operator's own value is never replaced.
    */
   releaseDefaults() {
-    // 0.8.3: the API reads the gateway's X-Forwarded-For only from a trusted proxy.
+    // 0.9.0: the API reads the gateway's X-Forwarded-For only from a trusted proxy.
     return "CINDERTRACE_TRUSTED_PROXIES" in this.env
       ? {}
       : { CINDERTRACE_TRUSTED_PROXIES: "gateway" };
