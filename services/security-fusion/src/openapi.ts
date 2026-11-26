@@ -12,6 +12,24 @@ import {
 import { securityFusionRouter } from "./routes/security-fusion.js";
 import { adminDecisionSchema } from "./services/approval-decisions.js";
 import { sentiApprovalAssertionSchema } from "./security/senti-approval.js";
+/** Lists served newest first, a page at a time (routes/pagination.ts). */
+export const pagedListPaths = ["/cases", "/events", "/entities", "/evidence", "/deletion-receipts"];
+const pageQuery = [
+  {
+    name: "cursor",
+    in: "query",
+    required: false,
+    description: "Opaque cursor from the previous page's nextCursor; the page holds the rows after it.",
+    schema: { type: "string", maxLength: 512 },
+  },
+  {
+    name: "limit",
+    in: "query",
+    required: false,
+    description: "Page size, 1 to 250 (default 100; 250 for evidence and deletion receipts).",
+    schema: { type: "integer", minimum: 1, maximum: 250 },
+  },
+];
 const caseListQuery = [
   { name: "status", in: "query", required: false, schema: { type: "string" } },
   { name: "archived", in: "query", required: false, schema: { type: "boolean" } },
@@ -80,6 +98,7 @@ export function buildOpenApiSpec() {
           schema: { type: "string" },
         })),
         ...(method === "get" && route.path === "/cases" ? caseListQuery : []),
+        ...(method === "get" && pagedListPaths.includes(route.path) ? pageQuery : []),
       ],
       responses: {
         200: { description: "Successful response" },
@@ -97,7 +116,7 @@ export function buildOpenApiSpec() {
     if(!operation)throw Error('Missing owned browser route in OpenAPI: '+route.method+' '+route.path);
     const created=route.method==='POST'&&(/\/(investigations|preserve|restart)$/.test(route.path)||route.path==='/lab/runs');
     const status=created?'201':route.method==='POST'&&route.path.endsWith('/release')?'202':'200';
-    operation.responses[status]={description:'Product-owned browser response',content:{'application/json':{schema:z.toJSONSchema(z.object({success:z.literal(true),data:route.response}))}}};
+    operation.responses[status]={description:'Product-owned browser response',content:{'application/json':{schema:z.toJSONSchema(z.object({success:z.literal(true),data:route.response,...(route.method==='GET'&&pagedListPaths.includes(route.path)?{nextCursor:z.string().nullable()}:{})}))}}};
   }
   paths[hiveEventsFeedRoute.path]={get:{summary:"HiveEvent v1 feed for the HiveXUI inbox: case and containment events from the last 14 days, oldest first by (occurredAt, id); same authentication and roles as case reads",tags:["Hive"],security:[{bearerAuth:[]},{browserCookie:[]}],
     parameters:[{name:"after",in:"query",required:false,description:"Opaque cursor from a previous page's nextCursor; the page holds events strictly after it.",schema:{type:"string",pattern:"^[A-Za-z0-9._~:-]{1,512}$"}},{name:"limit",in:"query",required:false,description:"Page size, 1 to 200; default 50.",schema:{type:"integer",minimum:1,maximum:200,default:50}}],

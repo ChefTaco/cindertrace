@@ -165,7 +165,8 @@ it("serves the event list when the limit is not a number", async () => {
     headers: { Authorization: `Bearer ${await adminToken()}` },
   });
   expect(response.status).toBe(200);
-  expect(fixture.eventTake).toBe(100);
+  // The default page of 100, plus one row to tell whether another page follows.
+  expect(fixture.eventTake).toBe(101);
 });
 
 it("rejects a case update that is not JSON or names an unknown status", async () => {

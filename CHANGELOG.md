@@ -6,6 +6,10 @@
 
 - The API no longer accepts the retired standalone console's HS256 bearer tokens (issuer `cindertrace-console`, signed with `SECURITY_CONSOLE_TOKEN_SECRET`). Anyone who could read `.env` could mint a 60-second ADMIN token with it, and nothing shipped issues them any more. `SECURITY_CONSOLE_TOKEN_SECRET` is no longer required or read. The demo script now signs in as the local administrator; the in-process test suites use a test-only bearer secret (`CINDERTRACE_TEST_BEARER_SECRET`) that the API server refuses at startup.
 
+### Added
+
+- Cursor pagination for `/cases`, `/events`, `/entities`, `/evidence` and `/deletion-receipts`: responses carry `nextCursor`, `?cursor=` continues after the last row served, and `?limit=` (1 to 250) sets the page size. The first page is unchanged, so older cases are now reachable instead of only the newest 100 or 250. See [browser contracts](docs/BROWSER_CONTRACTS.md).
+
 ### Changed
 
 - Fresh Compose installations run HiveXUI 0.12.1, up from 0.12.0. `compose.yaml` names the version next to the digest.

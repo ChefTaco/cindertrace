@@ -5,6 +5,14 @@ schemas. Its `browser` export maps the exact browser routes HiveXUI uses and the
 envelopes; OpenAPI response schemas are generated from the same definitions.
 These contracts contain no datastore, signing, filesystem or deployment code.
 
+`/cases`, `/events`, `/entities` and `/evidence` (and the non-browser `/deletion-receipts`)
+are served newest first, a page at a time. Each response carries `nextCursor`; pass it
+back as `?cursor=` for the next page, and stop when it is `null`. `?limit=` sets the page
+size (1 to 250; default 100, or 250 for evidence and deletion receipts). The cursor is
+opaque and resumes strictly after the last row served, so rows that arrive meanwhile never
+shift a page; a tampered cursor is a 400 `INVALID_CURSOR`. Filters must stay the same
+from page to page.
+
 After committing a reviewed change, run `npm run contracts:browser -- --output
 NEW_DIRECTORY` to export the exact immutable public contract blobs and their
 SHA-256 provenance. The artifact holds `index.ts`, `lab.ts`, `browser-auth.ts`,
