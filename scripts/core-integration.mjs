@@ -294,6 +294,11 @@ try {
     planSha256: plan.plan_sha256,
     previewSha256: "a".repeat(64),
   };
+  // An approval the dispatcher would never send is refused while dispatch is off.
+  const disabled = await req(`/actions/${fixture.id}/approve`, "POST", decision);
+  assert.equal(disabled.status, 503);
+  assert.equal((await disabled.json()).error.code, "DISPATCH_DISABLED");
+  process.env.SECURITY_DISPATCH_ENABLED = "true";
   assert.equal(
     (
       await req(`/actions/${fixture.id}/approve`, "POST", {
