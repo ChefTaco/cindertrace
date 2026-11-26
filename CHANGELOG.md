@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-26
+
 ### Security
 
 - The API no longer accepts the retired standalone console's HS256 bearer tokens (issuer `cindertrace-console`, signed with `SECURITY_CONSOLE_TOKEN_SECRET`). Anyone who could read `.env` could mint a 60-second ADMIN token with it, and nothing shipped issues them any more. `SECURITY_CONSOLE_TOKEN_SECRET` is no longer required or read. The demo script now signs in as the local administrator; the in-process test suites use a test-only bearer secret (`CINDERTRACE_TEST_BEARER_SECRET`) that the API server refuses at startup.
@@ -41,10 +43,9 @@
 
 - The managed upgrade now restarts `ui` when the release pins a different HiveXUI image, and writes `CINDERTRACE_UI_IMAGE` to `.env`. A `compose.override.yaml` that sets the `ui` image itself stops the upgrade; set `CINDERTRACE_UI_IMAGE` there instead.
 - Remove `SECURITY_CONSOLE_TOKEN_SECRET` from `.env` when convenient; it is ignored. Any script of your own that minted console tokens with it must sign in instead (local sign-in or Oathweave).
-- A `SECURITY_APPROVAL_MODE` value other than `local`, `console` or `external` now stops the API at startup.
-- This release adds an additive migration (`20261126000000_source_poll_stats`: three nullable columns on `security_fusion_source_state`); run the upgrade with migrations allowed. Upgrade the collector and the API together to see poll counts; either works with the other's older version.
+- This release adds one additive migration, `20261126000000_source_poll_stats` (three nullable columns on `security_fusion_source_state`). Run the upgrade with migrations allowed; a Hive suite upgrade that pins this release needs `--allow-migrations`. The schema profile stays `cindertrace-v2`. Older application code ignores the new columns, but no down migration is applied and `release.json` still declares `rollbackCompatible=false`, so moving back to 0.9.x means a verified restore of a pre-upgrade backup. Upgrade the collector and the API together to see poll counts; either works with the other's older version.
 - Alert on `security_fusion_audit_append_failures` increasing: an audit append failure no longer fails the request.
-- Check `SECURITY_PLUGIN_READ_DIGESTS_JSON` and `CINDERTRACE_OATHWEAVE_IDENTITIES_JSON` before upgrading: an invalid value now stops the API. So does an invalid `CINDERTRACE_BACKUP_MAX_AGE_HOURS`, `SECURITY_APPROVAL_MAX_AUTH_AGE_SECONDS`, `SECURITY_APPROVAL_DISTINCT_APPROVER` or `CINDERTRACE_LOCAL_ACCOUNTS_JSON`.
+- Startup now fails on invalid configuration instead of failing requests later. Check `.env` before upgrading: the API stops on an invalid `SECURITY_PLUGIN_READ_DIGESTS_JSON`, `CINDERTRACE_OATHWEAVE_IDENTITIES_JSON`, `CINDERTRACE_BACKUP_MAX_AGE_HOURS`, `SECURITY_APPROVAL_MAX_AUTH_AGE_SECONDS`, `SECURITY_APPROVAL_DISTINCT_APPROVER` or `CINDERTRACE_LOCAL_ACCOUNTS_JSON`; on a `SECURITY_APPROVAL_MODE` other than `local`, `console` or `external`; when a `DASHBOARD_*` setting and its `CINDERTRACE_*` name are both set to different values; and when `CINDERTRACE_TEST_BEARER_SECRET` is set.
 - The `backup` service is in the new `compose.yaml`. An installation's own `compose.yaml` is kept by `npm run upgrade`; take the new one from the release (keeping your changes) to use it.
 - Nothing changes for installations without extra local accounts or TOTP: the administrator signs in as before and keeps its sessions. Setting `CINDERTRACE_ADMIN_TOTP_SECRET` ends the administrator's current sessions. HiveXUI needs a code field before TOTP accounts can sign in through it.
 
