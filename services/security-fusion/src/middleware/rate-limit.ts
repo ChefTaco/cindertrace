@@ -3,9 +3,10 @@ import { Redis } from "ioredis";
 import { HiveError } from "@hivemagnus/hive-common/errors";
 import {
   addressKey,
+  createRedisSlidingWindowStore,
   enforceRateLimit,
-  type RateLimitResult,
   type RateLimitStore,
+  type SlidingWindowRedis,
 } from "@hivemagnus/hive-common/rate-limit";
 import { incMetric } from "../routes/metrics.js";
 import { clientAddress } from "../utils/client-address.js";
@@ -31,47 +32,31 @@ function getRedis(): Redis {
 }
 
 /**
- * A hive-common `RateLimitStore` over a Redis sliding window: every request in the last
- * `windowMs` counts, refused ones included, so a client that keeps retrying stays
- * refused. Shared by every API process and kept across restarts. Throws when Redis
- * cannot be reached.
+ * The Redis sliding window (hive-common `createRedisSlidingWindowStore()`): every request in the
+ * last `windowMs` counts, refused ones included, so a client that keeps retrying stays refused,
+ * and a refusal's Retry-After is the whole window. Shared by every API process and kept across
+ * restarts; each key's sorted set keeps at most `max + 1` entries. Keys stay
+ * `<REDIS_PREFIX><keyPrefix>:<client key>`. Throws when Redis cannot be reached or answers a
+ * command with an error or an unreadable reply, which the middleware treats as unavailable.
  */
-export function redisSlidingWindowStore(opts: {
+export function redisRateLimitStore(opts: {
   windowMs: number;
   max: number;
   keyPrefix: string;
-  redis?: () => Pick<Redis, "pipeline">;
+  redis?: () => SlidingWindowRedis;
 }): RateLimitStore {
-  const redis = opts.redis ?? getRedis;
-  return {
-    async consume(key: string): Promise<RateLimitResult> {
-      const redisKey = `${REDIS_PREFIX}${opts.keyPrefix}:${key}`;
-      const now = Date.now();
-      const pipe = redis().pipeline();
-      pipe.zremrangebyscore(redisKey, "-inf", now - opts.windowMs);
-      pipe.zadd(redisKey, now, `${now}-${Math.random()}`);
-      pipe.zcard(redisKey);
-      pipe.pexpire(redisKey, opts.windowMs);
-      const results = await pipe.exec();
-      const failed = results?.find(([error]) => error);
-      if (failed) throw failed[0];
-      const count = (results?.[2]?.[1] as number) ?? 0;
-      const allowed = count <= opts.max;
-      return {
-        allowed,
-        limit: opts.max,
-        remaining: Math.max(0, opts.max - count),
-        // The window is the longest a refused client waits; it is what Retry-After says.
-        retryAfterMs: allowed ? 0 : opts.windowMs,
-        resetMs: opts.windowMs,
-      };
-    },
-  };
+  return createRedisSlidingWindowStore({
+    redis: opts.redis ?? getRedis,
+    windowMs: opts.windowMs,
+    max: opts.max,
+    keyPrefix: `${REDIS_PREFIX}${opts.keyPrefix}:`,
+    retryAfter: "window",
+  });
 }
 
 /**
  * Per-client rate limit on hive-common `/rate-limit` (`enforceRateLimit()` over the
- * Redis store above). Keyed by client address: the socket peer, or the X-Forwarded-For
+ * Redis sliding window above). Keyed by client address: the socket peer, or the X-Forwarded-For
  * client when the peer is a trusted proxy (CINDERTRACE_TRUSTED_PROXIES, see
  * utils/client-address.ts), so callers behind the gateway or Hive's ingress get their
  * own budgets. IPv6 clients are keyed per address. Falls through (allows) if Redis is
@@ -94,7 +79,7 @@ export function rateLimitMiddleware(
   const windowMs = opts.windowMs ?? 60_000;
   const store =
     opts.store ??
-    redisSlidingWindowStore({
+    redisRateLimitStore({
       windowMs,
       max: opts.max ?? 100,
       keyPrefix: opts.keyPrefix ?? "rl",

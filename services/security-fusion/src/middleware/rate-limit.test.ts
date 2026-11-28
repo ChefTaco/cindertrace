@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import type { AddressInfo } from "node:net";
 import { afterEach, expect, it, vi } from "vitest";
 import { createRateLimiter } from "@hivemagnus/hive-common/rate-limit";
-import { rateLimitMiddleware, redisSlidingWindowStore } from "./rate-limit.js";
+import { rateLimitMiddleware, redisRateLimitStore } from "./rate-limit.js";
 
 let server: ServerType | undefined;
 afterEach(async () => {
@@ -79,6 +79,16 @@ it("counts every request in the Redis window, refused ones included, and keys it
         });
         return chain;
       },
+      zremrangebyrank(key: string, start: number, stop: number) {
+        ops.push(() => {
+          const scores = sets.get(key) ?? [];
+          const to = stop < 0 ? scores.length + stop : stop;
+          const removed = Math.max(0, to - start + 1);
+          sets.set(key, scores.slice(removed));
+          return [null, removed];
+        });
+        return chain;
+      },
       zcard(key: string) {
         ops.push(() => [null, sets.get(key)?.length ?? 0]);
         return chain;
@@ -91,16 +101,17 @@ it("counts every request in the Redis window, refused ones included, and keys it
     };
     return chain;
   };
-  const store = redisSlidingWindowStore({
+  const store = redisRateLimitStore({
     windowMs: 60_000,
     max: 2,
     keyPrefix: "rl",
-    redis: () => ({ pipeline }) as never,
+    redis: () => ({ pipeline }),
   });
   const outcomes = [];
-  for (let index = 0; index < 4; index++) outcomes.push((await store.consume("198.51.100.4")).allowed);
-  expect(outcomes).toEqual([true, true, false, false]);
-  expect(sets.get("cindertrace-rl:198.51.100.4")).toHaveLength(4);
+  for (let index = 0; index < 5; index++) outcomes.push((await store.consume("198.51.100.4")).allowed);
+  expect(outcomes).toEqual([true, true, false, false, false]);
+  // Refused requests stay in the window, but the set keeps only the newest max + 1 of them.
+  expect(sets.get("cindertrace-rl:198.51.100.4")).toHaveLength(3);
   expect(new Set(keys)).toEqual(new Set(["cindertrace-rl:198.51.100.4"]));
   expect((await store.consume("203.0.113.9")).allowed).toBe(true);
 });
@@ -122,4 +133,29 @@ it("answers 503 on a sensitive route when the store fails, and lets other routes
   open.use("*", rateLimitMiddleware({ store: failing }));
   open.get("/ping", (c) => c.text("ok"));
   expect((await open.request("/ping")).status).toBe(200);
+});
+
+it("treats a Redis command error or a discarded pipeline as unavailable: 503 on a sensitive route", async () => {
+  vi.stubEnv("NODE_ENV", "production");
+  const replies: Array<Array<[Error | null, unknown]> | null> = [
+    [[null, 0], [null, 1], [null, 0], [new Error("WRONGTYPE Operation against a key holding the wrong kind of value"), null], [null, 1]],
+    null,
+  ];
+  for (const reply of replies) {
+    const chain = {
+      zremrangebyscore: () => chain,
+      zadd: () => chain,
+      zremrangebyrank: () => chain,
+      zcard: () => chain,
+      pexpire: () => chain,
+      exec: async () => reply,
+    };
+    const store = redisRateLimitStore({ windowMs: 60_000, max: 5, keyPrefix: "rl", redis: () => ({ pipeline: () => chain }) });
+    const app = new Hono();
+    app.use("*", rateLimitMiddleware({ store, failClosed: true }));
+    app.get("/ping", (c) => c.text("ok"));
+    const response = await app.request("/ping");
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "RATE_LIMIT_UNAVAILABLE" });
+  }
 });
