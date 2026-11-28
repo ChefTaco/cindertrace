@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@cindertrace/contracts": "0.10.0",
-    "@hivemagnus/hive-common": "^0.10.0"
+    "@hivemagnus/hive-common": "^0.11.1"
   },
   "license": "Apache-2.0",
   "description": "Cindertrace collector"
