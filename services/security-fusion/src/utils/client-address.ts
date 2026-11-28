@@ -2,6 +2,10 @@ import { getConnInfo } from "@hono/node-server/conninfo";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import type { Context } from "hono";
+import {
+  normalizeIpAddress as normalizeForwardedAddress,
+  resolveClientAddress as resolveForwardedClient,
+} from "@hivemagnus/hive-common/rate-limit";
 import { normalizeIpAddress } from "./ip.js";
 
 /**
@@ -17,6 +21,10 @@ import { normalizeIpAddress } from "./ip.js";
  * CINDERTRACE_TRUSTED_PROXIES is a comma- or space-separated list of IP addresses,
  * CIDR ranges, host names (resolved through DNS, such as the Compose service `gateway`)
  * and the keyword `loopback`. Unset, it is `loopback`; `none` trusts no proxy.
+ *
+ * The header walk itself is hive-common's `/rate-limit` `resolveClientAddress()`.
+ * Its trusted-proxy set is synchronous and takes no host names, so the trust of
+ * each address it may consult is settled here first (host names through DNS).
  */
 export const DEFAULT_TRUSTED_PROXIES = "loopback";
 const MAX_FORWARDED_HOPS = 32;
@@ -131,22 +139,39 @@ export function socketPeerAddress(c: Context): string {
   }
 }
 
-/** Resolve the client from the socket peer and, behind a trusted proxy, X-Forwarded-For. */
+/**
+ * Resolve the client from the socket peer and, behind a trusted proxy, X-Forwarded-For.
+ * "" when the socket peer is not known.
+ */
 export async function resolveClientAddress(
   peer: string,
   forwardedFor: string | undefined,
   proxies: TrustedProxies,
 ): Promise<string> {
-  let client = normalizeIpAddress(peer);
-  if (!client || !(await proxies.trusts(client)) || !forwardedFor) return client;
-  const hops = forwardedFor.split(",").slice(-MAX_FORWARDED_HOPS);
-  for (let index = hops.length - 1; index >= 0; index--) {
-    const hop = normalizeIpAddress(hops[index]);
-    if (!family(hop)) break; // Malformed: keep the last address a trusted proxy vouched for.
-    client = hop;
-    if (!(await proxies.trusts(hop))) break;
+  // hive-common reads the peer, then hops from the right up to the first one that is
+  // not a trusted proxy (or not an address); only those addresses need a verdict.
+  const trusted = new Set<string>();
+  const vouches = async (raw: string | undefined): Promise<boolean> => {
+    const address = normalizeForwardedAddress(raw);
+    if (address === undefined || !(await proxies.trusts(address))) return false;
+    trusted.add(address);
+    return true;
+  };
+  if ((await vouches(peer)) && forwardedFor) {
+    const hops = forwardedFor.split(",");
+    for (let index = hops.length - 1, read = 0; index >= 0 && read < MAX_FORWARDED_HOPS; index--, read++)
+      if (!(await vouches(hops[index]))) break;
   }
-  return client;
+  const client = resolveForwardedClient({
+    peer,
+    forwardedFor,
+    maxHops: MAX_FORWARDED_HOPS,
+    trusted: {
+      has: (address) => trusted.has(normalizeForwardedAddress(address) ?? ""),
+      entries: [...trusted],
+    },
+  });
+  return client.decision === "unknown_peer" ? "" : client.address;
 }
 
 export async function clientAddress(

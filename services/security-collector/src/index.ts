@@ -1,4 +1,4 @@
-import { collectHiveSecurity } from "./hive.js";
+import { collectHiveSecurity, hiveTokenProvider } from "./hive.js";
 import {
   parseUiSecurity,
   uiWindowStart,
@@ -152,7 +152,21 @@ function request(input: string | URL, init: RequestInit = {}) {
   });
 }
 
-const auditTokens = new OathweaveTokenCache(request);
+const auditTokens = new OathweaveTokenCache({
+  timeoutMs: runtimeConfig.httpTimeoutMs,
+});
+// Built at startup, so a token URL that is not HTTPS stops the collector here.
+const hiveTokens =
+  process.env["HIVE_IAM_SECURITY_URL"] &&
+  process.env["HIVE_IAM_SECURITY_CLIENT_SECRET"]
+    ? hiveTokenProvider({
+        iamUrl: process.env["HIVE_IAM_SECURITY_URL"],
+        clientId:
+          process.env["HIVE_IAM_SECURITY_CLIENT_ID"] ?? "security-exporter",
+        secret: process.env["HIVE_IAM_SECURITY_CLIENT_SECRET"],
+        timeoutMs: runtimeConfig.httpTimeoutMs,
+      })
+    : null;
 
 function signedHeaders(raw: string): Record<string, string> {
   const timestamp = new Date().toISOString();
@@ -361,10 +375,10 @@ async function pollJson(
 }
 
 async function pollHiveIam(): Promise<void> {
+  if (!hiveTokens) return;
   const next = await collectHiveSecurity({
     iamUrl: process.env["HIVE_IAM_SECURITY_URL"]!,
-    clientId: process.env["HIVE_IAM_SECURITY_CLIENT_ID"] ?? "security-exporter",
-    secret: process.env["HIVE_IAM_SECURITY_CLIENT_SECRET"]!,
+    tokens: hiveTokens,
     routerUrl: process.env["HIVE_SECURITY_EXPORT_URL"],
     checkpoint: cursors.get("hive"),
     request,
@@ -706,11 +720,7 @@ async function pollSources(): Promise<void> {
       runPoll("UI audit poll failed", enabledUiSources, pollUiSecurity),
     );
   const hivePolls: Array<() => Promise<void>> = [];
-  if (
-    process.env["HIVE_IAM_SECURITY_URL"] &&
-    process.env["HIVE_IAM_SECURITY_CLIENT_SECRET"]
-  )
-    hivePolls.push(pollHiveIam);
+  if (hiveTokens) hivePolls.push(pollHiveIam);
   if (process.env["HIVE_SECURITY_EXPORT_TOKEN"])
     throw new Error(
       "Hive static export credentials are retired; configure OAuth client credentials",

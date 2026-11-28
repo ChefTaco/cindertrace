@@ -1,8 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { collectHiveSecurity } from "./hive.js";
+import { collectHiveSecurity, hiveTokenProvider } from "./hive.js";
+import type { BoundedFetchResult } from "./runtime-security.js";
 const result = (body: unknown, status = 200) => ({
   response: new Response(null, { status }),
   body: new TextEncoder().encode(JSON.stringify(body)),
+});
+type Stub = (url: string | URL, init?: RequestInit) => Promise<BoundedFetchResult>;
+/** The same stub serves the token endpoint (through fetch) and the export requests. */
+const withTokens = (iamUrl: string, request: Stub) => ({
+  iamUrl,
+  request,
+  tokens: hiveTokenProvider({
+    iamUrl,
+    clientId: "security-exporter",
+    secret: "fixture-oauth",
+    fetch: async (input, init) => {
+      const { response, body } = await request(String(input), init);
+      return new Response(body, { status: response.status });
+    },
+  }),
 });
 const row = (id: string) => ({
   id,
@@ -13,17 +29,14 @@ describe("public Hive security export contract", () => {
   it("accepts an IAM API base URL without duplicating its version prefix", async () => {
     const calls: string[] = [];
     await collectHiveSecurity({
-      iamUrl: "https://iam.example.com/api/v1",
-      clientId: "security-exporter",
-      secret: "fixture-oauth",
-      enqueue: () => true,
-      request: async (input) => {
+      ...withTokens("https://iam.example.com/api/v1", async (input) => {
         const path = new URL(input).pathname;
         calls.push(path);
         return path === "/api/v1/oauth/token"
           ? result({ access_token: "fixture-access" })
           : result({ events: [], total: 0 });
-      },
+      }),
+      enqueue: () => true,
     });
     expect(calls).toEqual(["/api/v1/oauth/token", "/api/v1/audit"]);
   });
@@ -32,9 +45,6 @@ describe("public Hive security export contract", () => {
       events: unknown[] = [];
     let routerCalls = 0;
     const checkpoint = await collectHiveSecurity({
-      iamUrl: "https://iam.example.com",
-      clientId: "security-exporter",
-      secret: "fixture-oauth",
       routerUrl: "https://router.example.com/api/security/events",
       checkpoint: "old-cursor",
       now: new Date("2026-11-03T12:01:00Z"),
@@ -42,7 +52,7 @@ describe("public Hive security export contract", () => {
         events.push(event);
         return true;
       },
-      request: async (input, init) => {
+      ...withTokens("https://iam.example.com", async (input, init) => {
         const url = new URL(input);
         calls.push(url);
         if (url.pathname === "/api/v1/oauth/token") {
@@ -68,7 +78,7 @@ describe("public Hive security export contract", () => {
         }
         expect(url.searchParams.get("cursor")).toBe("recovery");
         return result({ events: [row("router-event")], nextCursor: "next" });
-      },
+      }),
     });
     expect(events).toHaveLength(202);
     expect(JSON.parse(checkpoint)).toEqual({
@@ -88,15 +98,51 @@ describe("public Hive security export contract", () => {
   it("does not return an advanced checkpoint when ingestion is full", async () => {
     await expect(
       collectHiveSecurity({
-        iamUrl: "https://iam.example.com",
-        clientId: "security-exporter",
-        secret: "fixture-oauth",
-        enqueue: () => false,
-        request: async (input) =>
+        ...withTokens("https://iam.example.com", async (input) =>
           new URL(input).pathname === "/api/v1/oauth/token"
             ? result({ access_token: "fixture-access" })
             : result({ events: [row("example")], total: 1 }),
+        ),
+        enqueue: () => false,
       }),
     ).rejects.toThrow("checkpoint held");
+  });
+  it("caches the token between polls and replaces a refused one once", async () => {
+    let issued = 0;
+    const seen: string[] = [];
+    const options = withTokens("https://iam.example.com", async (input, init) => {
+      const url = new URL(input);
+      if (url.pathname === "/api/v1/oauth/token")
+        return result({ access_token: `t${++issued}`, expires_in: 900 });
+      const auth = (init?.headers as Record<string, string>)["authorization"]!;
+      seen.push(auth);
+      return auth === "Bearer t1" && seen.length > 1
+        ? result({ error: "revoked" }, 401)
+        : result({ events: [], total: 0 });
+    });
+    await collectHiveSecurity({ ...options, enqueue: () => true });
+    await collectHiveSecurity({ ...options, enqueue: () => true });
+    expect(seen).toEqual(["Bearer t1", "Bearer t1", "Bearer t2"]);
+    expect(issued).toBe(2);
+  });
+  it("keeps the token endpoint status in the error", async () => {
+    await expect(
+      collectHiveSecurity({
+        ...withTokens("https://iam.example.com", async () =>
+          result({ error: "invalid_client" }, 401),
+        ),
+        enqueue: () => true,
+      }),
+    ).rejects.toThrow("Hive OAuth HTTP 401");
+  });
+  it("refuses a token URL that is not HTTPS at startup", () => {
+    for (const iamUrl of [
+      "http://iam.example.com",
+      "http://127.0.0.1:4000",
+      "https://user:pass@iam.example.com",
+    ])
+      expect(() =>
+        hiveTokenProvider({ iamUrl, clientId: "security-exporter", secret: "fixture-oauth" }),
+      ).toThrow("HIVE_IAM_SECURITY_URL must be an HTTPS URL");
   });
 });

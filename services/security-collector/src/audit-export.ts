@@ -14,6 +14,7 @@ import {
   type SecurityFusionSeverity,
 } from "@cindertrace/contracts";
 import { eventId } from "./parsers.js";
+import { collectorTokenProvider, type ServiceTokenProvider } from "./service-tokens.js";
 import {
   parseBoundedJson,
   type BoundedFetchResult,
@@ -76,7 +77,10 @@ function text(value: unknown, name: string, max = 512): string {
 
 /** `<oathweave>/api/v1/oauth/token`, accepting a base that already ends in `/api/v1`. */
 export function oathweaveTokenUrl(base: string): string {
-  const trimmed = httpsUrl(ENV.oathweaveUrl, base).href.replace(/\/+$/, "");
+  const url = httpsUrl(ENV.oathweaveUrl, base);
+  if (url.hash || url.search)
+    throw new Error(`${ENV.oathweaveUrl} must not contain a query or fragment`);
+  const trimmed = url.href.replace(/\/+$/, "");
   return `${trimmed.endsWith("/api/v1") ? trimmed : `${trimmed}/api/v1`}/oauth/token`;
 }
 
@@ -158,92 +162,51 @@ export function readAuditExportConfig(
   });
 }
 
-interface CachedToken {
-  token: string;
-  refreshAt: number;
-}
-
-function jwtAudiences(token: string): string[] | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1]!, "base64url").toString("utf8")) as {
-      aud?: unknown;
-    };
-    if (typeof payload.aud === "string") return [payload.aud];
-    if (Array.isArray(payload.aud)) return payload.aud.filter((x): x is string => typeof x === "string");
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Client-credentials tokens cached per client, audience and scope until shortly
- * before they expire (a fifth of the lifetime, at most one minute).
+ * Client-credentials tokens per client, audience and scope (an Oathweave
+ * machine client issues tokens for one audience), each from hive-common's
+ * `createServiceTokenProvider()`: cached, replaced before expiry, and an
+ * issued JWT for another audience refused.
  */
 export class OathweaveTokenCache {
-  readonly #cache = new Map<string, CachedToken>();
-  readonly #pending = new Map<string, Promise<string>>();
+  readonly #providers = new Map<string, ServiceTokenProvider>();
 
   public constructor(
-    private readonly request: Request,
-    private readonly now: () => number = () => Date.now(),
+    private readonly options: {
+      fetch?: typeof fetch;
+      now?: () => number;
+      timeoutMs?: number;
+      /** Tests only: allow an `http:` loopback token URL. */
+      allowInsecureLoopback?: boolean;
+    } = {},
   ) {}
 
-  #key(credentials: ClientCredentials, audience: string, scope: string): string {
-    return JSON.stringify([credentials.tokenUrl, credentials.clientId, audience, scope]);
+  #provider(credentials: ClientCredentials, audience: string, scope: string): ServiceTokenProvider {
+    const key = JSON.stringify([credentials.tokenUrl, credentials.clientId, audience, scope]);
+    let provider = this.#providers.get(key);
+    if (!provider) {
+      provider = collectorTokenProvider(
+        {
+          tokenUrl: credentials.tokenUrl,
+          clientId: credentials.clientId,
+          clientSecret: credentials.clientSecret,
+          audience,
+          scope,
+          ...this.options,
+        },
+        (status) => `Oathweave token endpoint returned ${status}`,
+      );
+      this.#providers.set(key, provider);
+    }
+    return provider;
   }
 
   public async token(credentials: ClientCredentials, audience: string, scope: string): Promise<string> {
-    const key = this.#key(credentials, audience, scope);
-    const cached = this.#cache.get(key);
-    if (cached && this.now() < cached.refreshAt) return cached.token;
-    const pending = this.#pending.get(key);
-    if (pending) return pending;
-    const next = this.#fetch(credentials, audience, scope)
-      .then((value) => {
-        this.#cache.set(key, value);
-        return value.token;
-      })
-      .finally(() => this.#pending.delete(key));
-    this.#pending.set(key, next);
-    return next;
+    return this.#provider(credentials, audience, scope).token();
   }
 
   public invalidate(credentials: ClientCredentials, audience: string, scope: string): void {
-    this.#cache.delete(this.#key(credentials, audience, scope));
-  }
-
-  async #fetch(credentials: ClientCredentials, audience: string, scope: string): Promise<CachedToken> {
-    const { response, body } = await this.request(credentials.tokenUrl, {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        accept: "application/json",
-      },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: credentials.clientId,
-        client_secret: credentials.clientSecret,
-        scope,
-        audience,
-      }),
-    });
-    if (!response.ok) throw new Error(`Oathweave token endpoint returned ${response.status}`);
-    const value = parseBoundedJson<{ access_token?: unknown; expires_in?: unknown }>(body, "Oathweave token");
-    if (typeof value.access_token !== "string" || !value.access_token)
-      throw new Error("Oathweave token response is incomplete");
-    const audiences = jwtAudiences(value.access_token);
-    if (audiences && !audiences.includes(audience))
-      throw new Error(`Oathweave token audience does not include ${audience}`);
-    const lifetime =
-      typeof value.expires_in === "number" && Number.isFinite(value.expires_in) && value.expires_in > 0
-        ? value.expires_in
-        : 300;
-    const skew = Math.min(60, lifetime / 5);
-    return { token: value.access_token, refreshAt: this.now() + (lifetime - skew) * 1000 };
+    this.#provider(credentials, audience, scope).invalidate();
   }
 }
 

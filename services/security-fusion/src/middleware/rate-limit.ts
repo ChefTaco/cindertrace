@@ -1,5 +1,12 @@
 import type { MiddlewareHandler } from "hono";
 import { Redis } from "ioredis";
+import { HiveError } from "@hivemagnus/hive-common/errors";
+import {
+  addressKey,
+  enforceRateLimit,
+  type RateLimitResult,
+  type RateLimitStore,
+} from "@hivemagnus/hive-common/rate-limit";
 import { incMetric } from "../routes/metrics.js";
 import { clientAddress } from "../utils/client-address.js";
 
@@ -24,10 +31,51 @@ function getRedis(): Redis {
 }
 
 /**
- * Sliding-window rate limiter backed by Redis.
- * Keyed by client address: the socket peer, or the X-Forwarded-For client when the
- * peer is a trusted proxy (see utils/client-address.ts). Falls through (allows) if
- * Redis is unavailable, unless failClosed is set.
+ * A hive-common `RateLimitStore` over a Redis sliding window: every request in the last
+ * `windowMs` counts, refused ones included, so a client that keeps retrying stays
+ * refused. Shared by every API process and kept across restarts. Throws when Redis
+ * cannot be reached.
+ */
+export function redisSlidingWindowStore(opts: {
+  windowMs: number;
+  max: number;
+  keyPrefix: string;
+  redis?: () => Pick<Redis, "pipeline">;
+}): RateLimitStore {
+  const redis = opts.redis ?? getRedis;
+  return {
+    async consume(key: string): Promise<RateLimitResult> {
+      const redisKey = `${REDIS_PREFIX}${opts.keyPrefix}:${key}`;
+      const now = Date.now();
+      const pipe = redis().pipeline();
+      pipe.zremrangebyscore(redisKey, "-inf", now - opts.windowMs);
+      pipe.zadd(redisKey, now, `${now}-${Math.random()}`);
+      pipe.zcard(redisKey);
+      pipe.pexpire(redisKey, opts.windowMs);
+      const results = await pipe.exec();
+      const failed = results?.find(([error]) => error);
+      if (failed) throw failed[0];
+      const count = (results?.[2]?.[1] as number) ?? 0;
+      const allowed = count <= opts.max;
+      return {
+        allowed,
+        limit: opts.max,
+        remaining: Math.max(0, opts.max - count),
+        // The window is the longest a refused client waits; it is what Retry-After says.
+        retryAfterMs: allowed ? 0 : opts.windowMs,
+        resetMs: opts.windowMs,
+      };
+    },
+  };
+}
+
+/**
+ * Per-client rate limit on hive-common `/rate-limit` (`enforceRateLimit()` over the
+ * Redis store above). Keyed by client address: the socket peer, or the X-Forwarded-For
+ * client when the peer is a trusted proxy (CINDERTRACE_TRUSTED_PROXIES, see
+ * utils/client-address.ts), so callers behind the gateway or Hive's ingress get their
+ * own budgets. IPv6 clients are keyed per address. Falls through (allows) if Redis is
+ * unavailable, unless failClosed is set.
  *
  * @param opts.windowMs  Time window in milliseconds (default: 60_000 = 1 minute)
  * @param opts.max       Maximum requests per window (default: 100)
@@ -39,35 +87,29 @@ export function rateLimitMiddleware(
     max?: number;
     keyPrefix?: string;
     failClosed?: boolean;
+    /** Tests: the store to spend from instead of Redis. */
+    store?: RateLimitStore;
   } = {},
 ): MiddlewareHandler {
   const windowMs = opts.windowMs ?? 60_000;
-  const max = opts.max ?? 100;
-  const prefix = opts.keyPrefix ?? "rl";
+  const store =
+    opts.store ??
+    redisSlidingWindowStore({
+      windowMs,
+      max: opts.max ?? 100,
+      keyPrefix: opts.keyPrefix ?? "rl",
+    });
 
   return async (c, next) => {
     // Browsers arrive through the gateway or Hive's ingress; a caller-written
     // forwarding header is read only past a configured trusted proxy.
     const ip = (await clientAddress(c)) || "unknown-peer";
 
-    const key = `${REDIS_PREFIX}${prefix}:${ip}`;
-    const now = Date.now();
-    const windowStart = now - windowMs;
-
     try {
-      const redis = getRedis();
-      const pipe = redis.pipeline();
-      pipe.zremrangebyscore(key, "-inf", windowStart);
-      pipe.zadd(key, now, `${now}-${Math.random()}`);
-      pipe.zcard(key);
-      pipe.pexpire(key, windowMs);
-      const results = await pipe.exec();
-
-      const count = (results?.[2]?.[1] as number) ?? 0;
-
-      if (count > max) {
-        const retryAfter = Math.ceil(windowMs / 1000);
-        c.header("Retry-After", String(retryAfter));
+      await enforceRateLimit(store, addressKey(ip, { ipv6PrefixLength: 128 }));
+    } catch (error) {
+      if (HiveError.is(error, "rate_limited")) {
+        c.header("Retry-After", error.headers?.["retry-after"] ?? String(Math.ceil(windowMs / 1000)));
         return c.json(
           {
             error: "RATE_LIMITED",
@@ -76,7 +118,6 @@ export function rateLimitMiddleware(
           429,
         );
       }
-    } catch {
       lastRateLimitError = "Redis unavailable for rate limiting";
       lastRateLimitErrorAt = new Date().toISOString();
       incMetric("rateLimiterFailures");

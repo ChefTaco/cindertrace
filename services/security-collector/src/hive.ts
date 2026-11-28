@@ -4,11 +4,63 @@ import {
   type BoundedFetchResult,
 } from "./runtime-security.js";
 import type { SecurityFusionEvent } from "@cindertrace/contracts";
-type Checkpoint = { version: 1; iamThrough?: string; routerCursor?: string };
-export async function collectHiveSecurity(options: {
+import {
+  collectorTokenProvider,
+  type ServiceTokenProvider,
+} from "./service-tokens.js";
+
+/** The scopes of Hive's public `security-exporter` client. */
+export const HIVE_SECURITY_SCOPE = "iam:audit:read router:security-events:read";
+
+/** `<iam>/api/v1`, accepting a base that already ends in `/api/v1`. */
+export function hiveIamApi(iamUrl: string): string {
+  const base = iamUrl.replace(/\/$/, "");
+  return base.endsWith("/api/v1") ? base : base + "/api/v1";
+}
+
+/**
+ * The Hive `security-exporter` client-credentials token, from hive-common's
+ * service token provider at `<HIVE_IAM_SECURITY_URL>/api/v1/oauth/token`.
+ * The token URL must be HTTPS; anything else stops the collector at startup.
+ */
+export function hiveTokenProvider(options: {
   iamUrl: string;
   clientId: string;
   secret: string;
+  fetch?: typeof fetch;
+  timeoutMs?: number;
+}): ServiceTokenProvider {
+  let tokenUrl: string;
+  try {
+    tokenUrl = new URL(hiveIamApi(options.iamUrl) + "/oauth/token").href;
+  } catch {
+    throw new Error("HIVE_IAM_SECURITY_URL must be an HTTPS URL");
+  }
+  try {
+    return collectorTokenProvider(
+      {
+        tokenUrl,
+        clientId: options.clientId,
+        clientSecret: options.secret,
+        scope: HIVE_SECURITY_SCOPE,
+        ...(options.fetch ? { fetch: options.fetch } : {}),
+        ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+      },
+      (status) => `Hive OAuth HTTP ${status}`,
+    );
+  } catch (error) {
+    if (error instanceof TypeError && /tokenUrl/.test(error.message))
+      throw new Error(
+        "HIVE_IAM_SECURITY_URL must be an HTTPS URL without credentials or a fragment",
+      );
+    throw error;
+  }
+}
+
+type Checkpoint = { version: 1; iamThrough?: string; routerCursor?: string };
+export async function collectHiveSecurity(options: {
+  iamUrl: string;
+  tokens: ServiceTokenProvider;
   routerUrl?: string;
   checkpoint?: string;
   now?: Date;
@@ -35,28 +87,17 @@ export async function collectHiveSecurity(options: {
     end = now.toISOString();
   const start =
     prior.iamThrough ?? new Date(now.getTime() - 15 * 60000).toISOString();
-  const base = options.iamUrl.replace(/\/$/, "");
-  const api = base.endsWith("/api/v1") ? base : base + "/api/v1";
-  const tokenResponse = await request(api + "/oauth/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: options.clientId,
-      client_secret: options.secret,
-      scope: "iam:audit:read router:security-events:read",
-    }),
-  });
-  if (!tokenResponse.response.ok)
-    throw new Error(`Hive OAuth HTTP ${tokenResponse.response.status}`);
-  const token = parseBoundedJson<{ access_token?: string }>(
-    tokenResponse.body,
-    "Hive OAuth",
-  ).access_token;
-  if (!token) throw new Error("Hive OAuth response is incomplete");
-  const headers = {
-    authorization: `Bearer ${token}`,
-    accept: "application/json",
+  const api = hiveIamApi(options.iamUrl);
+  // The token is cached between polls; a refused one is replaced and retried once.
+  const authorized = async (url: string | URL): Promise<BoundedFetchResult> => {
+    for (let attempt = 0; ; attempt++) {
+      const token = await options.tokens.token();
+      const result = await request(url, {
+        headers: { authorization: `Bearer ${token}`, accept: "application/json" },
+      });
+      if (result.response.status !== 401 || attempt > 0) return result;
+      options.tokens.invalidate();
+    }
   };
   for (let page = 1; ; page++) {
     if (page > 100)
@@ -70,7 +111,7 @@ export async function collectHiveSecurity(options: {
       from: start,
       to: end,
     }).toString();
-    const result = await request(url, { headers });
+    const result = await authorized(url);
     if (!result.response.ok)
       throw new Error(`Hive audit HTTP ${result.response.status}`);
     const body = parseBoundedJson<{
@@ -106,7 +147,7 @@ export async function collectHiveSecurity(options: {
       const url = new URL(options.routerUrl);
       url.searchParams.set("limit", "500");
       if (next.routerCursor) url.searchParams.set("cursor", next.routerCursor);
-      const result = await request(url, { headers });
+      const result = await authorized(url);
       if (result.response.status === 410 && recovery === 0) {
         const body = parseBoundedJson<{
           earliest_available_cursor?: string;

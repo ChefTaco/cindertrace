@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   securityFusionEventSchema,
   type HiveAuditRecord,
@@ -19,6 +19,17 @@ const result = (body: unknown, status = 200) => ({
   response: new Response(null, { status }),
   body: new TextEncoder().encode(JSON.stringify(body)),
 });
+
+type Stub = (input: string | URL, init?: RequestInit) => Promise<{ response: Response; body: Uint8Array }>;
+/** A token cache whose token endpoint is the given stub, reached through fetch as hive-common does. */
+const cacheFor = (stub: Stub, now?: () => number) =>
+  new OathweaveTokenCache({
+    fetch: async (input, init) => {
+      const { response, body } = await stub(String(input), init);
+      return new Response(body, { status: response.status });
+    },
+    ...(now ? { now } : {}),
+  });
 
 const credentials: ClientCredentials = {
   tokenUrl: "https://iam.example.com/api/v1/oauth/token",
@@ -143,6 +154,8 @@ describe("audit export configuration", () => {
       }),
     ).toThrow("not both");
     expect(oathweaveTokenUrl("https://iam.example.com/")).toBe(credentials.tokenUrl);
+    expect(() => oathweaveTokenUrl("http://iam.example.com")).toThrow("HTTPS");
+    expect(() => oathweaveTokenUrl("https://iam.example.com/#x")).toThrow("query or fragment");
   });
 });
 
@@ -244,7 +257,7 @@ describe("HiveAuditRecord mapping", () => {
 });
 
 function tokenCache(counter: { tokens: number }, now = () => 0) {
-  return new OathweaveTokenCache(async (input, init) => {
+  return cacheFor(async (input, init) => {
     expect(String(input)).toBe(credentials.tokenUrl);
     const body = new URLSearchParams(String(init?.body));
     expect(body.get("grant_type")).toBe("client_credentials");
@@ -261,10 +274,21 @@ describe("Oathweave token cache", () => {
     expect(await cache.token(credentials, "hivemem", "hivemem:audit:read")).toBe("token-1");
     clock = 239_000;
     expect(await cache.token(credentials, "hivemem", "hivemem:audit:read")).toBe("token-1");
+    // Past 80 % of its lifetime the token is replaced in the background while still served.
     clock = 240_000;
-    expect(await cache.token(credentials, "hivemem", "hivemem:audit:read")).toBe("token-2");
+    expect(await cache.token(credentials, "hivemem", "hivemem:audit:read")).toBe("token-1");
+    await vi.waitFor(async () =>
+      expect(await cache.token(credentials, "hivemem", "hivemem:audit:read")).toBe("token-2"),
+    );
     expect(await cache.token(credentials, "hiveskills", "hiveskills:audit:read")).toBe("token-3");
     expect(counter.tokens).toBe(3);
+  });
+  it("refuses an http token URL", async () => {
+    const counter = { tokens: 0 };
+    await expect(
+      tokenCache(counter).token({ ...credentials, tokenUrl: "http://iam.example.com/api/v1/oauth/token" }, "hivemem", "s"),
+    ).rejects.toThrow("https");
+    expect(counter.tokens).toBe(0);
   });
   it("shares one in-flight request and rejects a token for another audience", async () => {
     const counter = { tokens: 0 };
@@ -273,11 +297,11 @@ describe("Oathweave token cache", () => {
     expect(counter.tokens).toBe(1);
     const jwt = (aud: string) =>
       ["e30", Buffer.from(JSON.stringify({ aud })).toString("base64url"), "sig"].join(".");
-    const audienceCheck = new OathweaveTokenCache(async () => result({ access_token: jwt("embermend") }));
+    const audienceCheck = cacheFor(async () => result({ access_token: jwt("embermend") }));
     await expect(audienceCheck.token(credentials, "hivemem", "s")).rejects.toThrow("audience");
-    const ok = new OathweaveTokenCache(async () => result({ access_token: jwt("hivemem") }));
+    const ok = cacheFor(async () => result({ access_token: jwt("hivemem") }));
     await expect(ok.token(credentials, "hivemem", "s")).resolves.toBe(jwt("hivemem"));
-    const refused = new OathweaveTokenCache(async () => result({ error: "invalid_client" }, 401));
+    const refused = cacheFor(async () => result({ error: "invalid_client" }, 401));
     await expect(refused.token(credentials, "hivemem", "s")).rejects.toThrow(
       "Oathweave token endpoint returned 401",
     );
@@ -314,7 +338,7 @@ describe("pollAuditSource", () => {
     const stats = { records: 0, pages: 0 };
     await pollAuditSource({
       config,
-      tokens: new OathweaveTokenCache(stub.request),
+      tokens: cacheFor(stub.request),
       cursor: "c1",
       setCursor: (cursor) => cursors.push(cursor),
       request: stub.request,
@@ -346,7 +370,7 @@ describe("pollAuditSource", () => {
     const cursors: string[] = [];
     await pollAuditSource({
       config,
-      tokens: new OathweaveTokenCache(stub.request),
+      tokens: cacheFor(stub.request),
       cursor: undefined,
       setCursor: (cursor) => cursors.push(cursor),
       request: stub.request,
@@ -363,7 +387,7 @@ describe("pollAuditSource", () => {
     await expect(
       pollAuditSource({
         config,
-        tokens: new OathweaveTokenCache(full.request),
+        tokens: cacheFor(full.request),
         cursor: undefined,
         setCursor: (cursor) => cursors.push(cursor),
         request: full.request,
@@ -380,7 +404,7 @@ describe("pollAuditSource", () => {
     const queued: SecurityFusionEvent[] = [];
     const error = await pollAuditSource({
       config,
-      tokens: new OathweaveTokenCache(bad.request),
+      tokens: cacheFor(bad.request),
       cursor: undefined,
       setCursor: (cursor) => cursors.push(cursor),
       request: bad.request,
@@ -396,7 +420,7 @@ describe("pollAuditSource", () => {
     await expect(
       pollAuditSource({
         config,
-        tokens: new OathweaveTokenCache(foreign.request),
+        tokens: cacheFor(foreign.request),
         cursor: undefined,
         setCursor: () => undefined,
         request: foreign.request,
@@ -416,7 +440,7 @@ describe("pollAuditSource", () => {
       seen.push(auth);
       return auth === "Bearer t1" ? result({ error: "expired" }, 401) : result({ data: [record(1)], nextCursor: null });
     };
-    const cache = new OathweaveTokenCache(request);
+    const cache = cacheFor(request);
     await pollAuditSource({ config, tokens: cache, cursor: undefined, setCursor: () => undefined, request, enqueue: () => true });
     expect(seen).toEqual(["Bearer t1", "Bearer t2"]);
     // Still refused after one refresh: fail rather than loop.
@@ -427,7 +451,7 @@ describe("pollAuditSource", () => {
     await expect(
       pollAuditSource({
         config,
-        tokens: new OathweaveTokenCache(always),
+        tokens: cacheFor(always),
         cursor: undefined,
         setCursor: () => undefined,
         request: always,
